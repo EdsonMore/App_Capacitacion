@@ -1,4 +1,4 @@
-﻿export const Colors = {
+export const Colors = {
   primary: '#0E3A28', // Dark Forest Green for main buttons and headers
   primaryDark: '#072418',
   primaryMedium: '#1B4D36',
@@ -103,3 +103,28 @@ export const Radius = {
   xl: 20,
   full: 9999,
 };
+
+export const Shadows = {
+  sm: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  md: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07,
+    shadowRadius: 5,
+    elevation: 2,
+  },
+  lg: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+};
+
