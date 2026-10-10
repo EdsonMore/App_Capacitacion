@@ -1,4 +1,4 @@
-﻿import { Lesson, ModuleItem, QuizQuestion, UserStats } from '@/types';
+import { Lesson, ModuleItem, QuizQuestion, UserStats } from '@/types';
 
 export const USER_STATS: UserStats = {
   streakDays: 4,
@@ -94,6 +94,8 @@ export const CURRENT_LESSON: Lesson = {
   tag: 'Técnica de Cosecha',
   videoDurationText: '03:00',
   videoProgressText: '02:15',
+  youtubeId: 'Ke6tR-Ef2uo',
+  youtubeUrl: 'https://youtu.be/Ke6tR-Ef2uo',
   keyPoints: [
     {
       id: 'kp-1',

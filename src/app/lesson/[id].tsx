@@ -8,6 +8,7 @@ import {
   Pressable,
   Platform,
   StatusBar,
+  Linking,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
@@ -77,83 +78,117 @@ export default function LessonDetailScreen() {
           </View>
         </View>
 
-        {/* Reproductor de Video Realista en Viñedo */}
+        {/* Reproductor de Video (YouTube o Simulación) */}
         <View style={[styles.videoPlayerContainer, Shadows.lg]}>
-          <ImageBackground
-            source={require('../../../assets/images/uvapro/lesson_video.jpg')}
-            style={styles.videoBackground}
-            resizeMode="cover"
-          >
-            {/* Tag Superior: Demostración en Campo */}
-            <View style={styles.fieldDemoTag}>
-              <View style={styles.redDot} />
-              <Text style={styles.fieldDemoText}>DEMOSTRACIÓN EN CAMPO</Text>
-            </View>
-
-            {/* Botón Central de Play/Pause */}
-            <Pressable
-              style={({ pressed }) => [
-                styles.centerPlayButton,
-                pressed && { transform: [{ scale: 0.95 }] },
-              ]}
-              onPress={() => setIsPlaying(!isPlaying)}
+          {CURRENT_LESSON.youtubeId && Platform.OS === 'web' ? (
+            <iframe
+              src={`https://www.youtube.com/embed/${CURRENT_LESSON.youtubeId}?autoplay=0&rel=0&modestbranding=1`}
+              title={CURRENT_LESSON.title}
+              style={{
+                width: '100%',
+                height: '100%',
+                border: 'none',
+                borderRadius: 16,
+              }}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            />
+          ) : (
+            <ImageBackground
+              source={require('../../../assets/images/uvapro/lesson_video.jpg')}
+              style={styles.videoBackground}
+              resizeMode="cover"
             >
-              <Ionicons
-                name={isPlaying ? 'pause' : 'play'}
-                size={34}
-                color="#FFFFFF"
-                style={!isPlaying ? { marginLeft: 4 } : undefined}
-              />
-            </Pressable>
+              {/* Tag Superior: Demostración en Campo */}
+              <View style={styles.fieldDemoTag}>
+                <View style={styles.redDot} />
+                <Text style={styles.fieldDemoText}>DEMOSTRACIÓN EN CAMPO</Text>
+              </View>
 
-            {/* Controles Inferiores de Reproducción */}
-            <View style={styles.videoControlsOverlay}>
-              {/* Barra de Tiempo Transcurrido */}
-              <View style={styles.videoTimelineRow}>
-                <View style={styles.videoProgressTrack}>
-                  <View style={[styles.videoProgressFill, { width: isPlaying ? '85%' : '75%' }]} />
+              {/* Botón Central de Play/Pause */}
+              <Pressable
+                style={({ pressed }) => [
+                  styles.centerPlayButton,
+                  pressed && { transform: [{ scale: 0.95 }] },
+                ]}
+                onPress={() => {
+                  if (CURRENT_LESSON.youtubeUrl) {
+                    Linking.openURL(CURRENT_LESSON.youtubeUrl);
+                  } else {
+                    setIsPlaying(!isPlaying);
+                  }
+                }}
+              >
+                <Ionicons
+                  name={CURRENT_LESSON.youtubeUrl ? 'logo-youtube' : (isPlaying ? 'pause' : 'play')}
+                  size={34}
+                  color={CURRENT_LESSON.youtubeUrl ? '#FF0000' : '#FFFFFF'}
+                  style={!isPlaying && !CURRENT_LESSON.youtubeUrl ? { marginLeft: 4 } : undefined}
+                />
+              </Pressable>
+
+              {/* Controles Inferiores de Reproducción */}
+              <View style={styles.videoControlsOverlay}>
+                {/* Barra de Tiempo Transcurrido */}
+                <View style={styles.videoTimelineRow}>
+                  <View style={styles.videoProgressTrack}>
+                    <View style={[styles.videoProgressFill, { width: isPlaying ? '85%' : '75%' }]} />
+                  </View>
+                  <Text style={styles.videoTimeCounter}>
+                    {isPlaying ? '02:35' : CURRENT_LESSON.videoProgressText} / {CURRENT_LESSON.videoDurationText}
+                  </Text>
                 </View>
-                <Text style={styles.videoTimeCounter}>
-                  {isPlaying ? '02:35' : CURRENT_LESSON.videoProgressText} / {CURRENT_LESSON.videoDurationText}
-                </Text>
+
+                {/* Barra de Botones Multimedia */}
+                <View style={styles.controlsButtonRow}>
+                  <Pressable
+                    style={styles.controlIconBtn}
+                    onPress={() => {
+                      if (CURRENT_LESSON.youtubeUrl) {
+                        Linking.openURL(CURRENT_LESSON.youtubeUrl);
+                      } else {
+                        setIsPlaying(!isPlaying);
+                      }
+                    }}
+                  >
+                    <MaterialIcons name="replay-10" size={22} color="#FFFFFF" />
+                  </Pressable>
+
+                  <Pressable style={styles.speedButton} onPress={toggleSpeed}>
+                    <Text style={styles.speedButtonText}>{playbackSpeed}</Text>
+                  </Pressable>
+
+                  <View style={{ flex: 1 }} />
+
+                  <Pressable style={styles.controlIconBtn}>
+                    <MaterialCommunityIcons name="subtitles-outline" size={20} color="#FFFFFF" />
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.controlIconBtn}
+                    onPress={() => setIsMuted(!isMuted)}
+                  >
+                    <Ionicons
+                      name={isMuted ? 'volume-mute' : 'volume-high'}
+                      size={20}
+                      color="#FFFFFF"
+                    />
+                  </Pressable>
+
+                  <Pressable
+                    style={styles.controlIconBtn}
+                    onPress={() => {
+                      if (CURRENT_LESSON.youtubeUrl) {
+                        Linking.openURL(CURRENT_LESSON.youtubeUrl);
+                      }
+                    }}
+                  >
+                    <MaterialCommunityIcons name="fullscreen" size={24} color="#FFFFFF" />
+                  </Pressable>
+                </View>
               </View>
-
-              {/* Barra de Botones Multimedia */}
-              <View style={styles.controlsButtonRow}>
-                <Pressable
-                  style={styles.controlIconBtn}
-                  onPress={() => setIsPlaying(!isPlaying)}
-                >
-                  <MaterialIcons name="replay-10" size={22} color="#FFFFFF" />
-                </Pressable>
-
-                <Pressable style={styles.speedButton} onPress={toggleSpeed}>
-                  <Text style={styles.speedButtonText}>{playbackSpeed}</Text>
-                </Pressable>
-
-                <View style={{ flex: 1 }} />
-
-                <Pressable style={styles.controlIconBtn}>
-                  <MaterialCommunityIcons name="subtitles-outline" size={20} color="#FFFFFF" />
-                </Pressable>
-
-                <Pressable
-                  style={styles.controlIconBtn}
-                  onPress={() => setIsMuted(!isMuted)}
-                >
-                  <Ionicons
-                    name={isMuted ? 'volume-mute' : 'volume-high'}
-                    size={20}
-                    color="#FFFFFF"
-                  />
-                </Pressable>
-
-                <Pressable style={styles.controlIconBtn}>
-                  <MaterialCommunityIcons name="fullscreen" size={24} color="#FFFFFF" />
-                </Pressable>
-              </View>
-            </View>
-          </ImageBackground>
+            </ImageBackground>
+          )}
         </View>
 
         {/* Tags de Duración y Técnica */}

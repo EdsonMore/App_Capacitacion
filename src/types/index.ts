@@ -1,4 +1,4 @@
-﻿export type ModuleStatus = 'completed' | 'in_progress' | 'available' | 'locked';
+export type ModuleStatus = 'completed' | 'in_progress' | 'available' | 'locked';
 
 export interface Lesson {
   id: string;
@@ -13,6 +13,8 @@ export interface Lesson {
   tag: string;
   videoDurationText: string;
   videoProgressText: string;
+  youtubeId?: string;
+  youtubeUrl?: string;
   keyPoints: {
     id: string;
     type: 'check' | 'critical';
