@@ -1,9 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Variables de entorno públicas de Expo
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+// Variables de entorno con soporte para nombres cortos o estándar de Expo
+const supabaseUrl = 
+  process.env.SUPABASE_URL || 
+  process.env.EXPO_PUBLIC_SUPABASE_URL || 
+  'https://bqggjoxeytoepwrwramx.supabase.co';
+
+const supabaseAnonKey = 
+  process.env.SUPABASE_ANON_KEY || 
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 
+  '';
 
 export const isSupabaseConfigured = Boolean(
   supabaseUrl && 
