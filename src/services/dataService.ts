@@ -4,9 +4,9 @@ import { CURRENT_LESSON, MODULES_LIST, QUIZ_QUESTION_DEMO, USER_STATS } from '@/
 import { isSupabaseConfigured, supabase } from './supabase';
 
 const STORAGE_KEYS = {
-  USER_STATS: '@uvapro_user_stats',
-  MODULES: '@uvapro_modules',
-  COMPLETED_LESSONS: '@uvapro_completed_lessons',
+  USER_STATS: '@purafruit_user_stats',
+  MODULES: '@purafruit_modules',
+  COMPLETED_LESSONS: '@purafruit_completed_lessons',
 };
 
 export const dataService = {

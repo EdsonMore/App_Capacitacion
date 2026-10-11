@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "UvaPro",
-    "slug": "UvaPro",
+    "name": "PuraFruit",
+    "slug": "PuraFruit",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "uvapro",
+    "scheme": "purafruit",
     "userInterfaceStyle": "automatic",
     "ios": {
       "icon": "./assets/expo.icon"

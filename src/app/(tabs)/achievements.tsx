@@ -4,16 +4,22 @@ import {
   Text,
   StyleSheet,
   ScrollView,
+  ImageBackground,
+  Pressable,
   Platform,
   StatusBar,
+  Alert,
+  Share,
 } from 'react-native';
-import { useFocusEffect } from 'expo-router';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Shadows } from '@/constants/theme';
 import { dataService } from '@/services/dataService';
 import { UserStats } from '@/types';
+import PuraFruitHeaderLogo from '@/components/PuraFruitHeaderLogo';
 
 export default function AchievementsScreen() {
+  const router = useRouter();
   const [stats, setStats] = useState<UserStats | null>(null);
 
   const loadStats = useCallback(async () => {
@@ -21,7 +27,7 @@ export default function AchievementsScreen() {
       const data = await dataService.getUserStats();
       setStats(data);
     } catch (e) {
-      console.warn('Error loading achievements:', e);
+      console.warn('Error loading achievements stats:', e);
     }
   }, []);
 
@@ -31,6 +37,22 @@ export default function AchievementsScreen() {
     }, [loadStats])
   );
 
+  const handleShareCertificate = async () => {
+    try {
+      await Share.share({
+        message:
+          '¡He completado con éxito el Módulo 2 de Pura Fruit Company! Certificado en Manejo de Racimos y Tijeras de Raleo en Fundo San Lorenzo - Piura. Score: 120/120 pts (100% precisión).',
+        title: 'Certificado PuraFruit - Piura',
+      });
+    } catch {
+      Alert.alert('Compartir Certificado', 'Certificado copiado al portapapeles listo para enviar a tu supervisor.');
+    }
+  };
+
+  const handleNextModule = () => {
+    router.push('/(tabs)/learn' as any);
+  };
+
   return (
     <View style={styles.screen}>
       <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
@@ -39,109 +61,228 @@ export default function AchievementsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.logoRow}>
-            <View style={styles.logoIcon}>
-              <MaterialCommunityIcons name="fruit-grapes" size={16} color="#FFFFFF" />
-            </View>
-            <View>
-              <Text style={styles.logoSub}>UVAPRO</Text>
-              <Text style={styles.logoTitle}>Mis logros</Text>
-            </View>
-          </View>
+        {/* Header Superior PuraFruit Company */}
+        <View style={styles.topHeader}>
+          <PuraFruitHeaderLogo size="md" title="Mis Logros" />
         </View>
 
-        {/* Hero Card de Reconocimiento */}
-        <View style={[styles.heroCard, Shadows.lg]}>
-          <View style={styles.medalCircle}>
-            <MaterialCommunityIcons name="medal" size={32} color={Colors.primary} />
+        {/* Tag Superior y Mensaje de Éxito */}
+        <View style={styles.successBannerContainer}>
+          <View style={styles.successPillTag}>
+            <Text style={styles.successPillText}>MÓDULO FINALIZADO CON ÉXITO</Text>
           </View>
-          <Text style={styles.heroRank}>Cosechador de Exportación</Text>
-          <Text style={styles.heroPoints}>{stats?.points || 340} pts acumulados</Text>
-          <Text style={styles.heroSub}>
-            Cumplimiento activo de estándares GlobalG.A.P. en campo
+          <Text style={styles.successHeading}>¡Excelente trabajo!</Text>
+          <Text style={styles.successSubtitle}>
+            Has demostrado maestría técnica en las normas de cosecha de Piura.
           </Text>
-        </View>
-
-        {/* Resumen de Métricas */}
-        <View style={styles.metricsGrid}>
-          <View style={[styles.metricCard, Shadows.sm]}>
-            <MaterialCommunityIcons name="fire" size={24} color="#D97706" />
-            <Text style={styles.metricValue}>{stats?.streakDays || 4} días</Text>
-            <Text style={styles.metricLabel}>Racha actual</Text>
-          </View>
-
-          <View style={[styles.metricCard, Shadows.sm]}>
-            <Ionicons name="ribbon-outline" size={24} color="#7E22CE" />
-            <Text style={styles.metricValue}>{stats?.routeLessonsText || '9/20'}</Text>
-            <Text style={styles.metricLabel}>Lecciones aprobadas</Text>
-          </View>
-
-          <View style={[styles.metricCard, Shadows.sm]}>
-            <MaterialCommunityIcons name="shield-check" size={24} color="#1D7A46" />
-            <Text style={styles.metricValue}>100%</Text>
-            <Text style={styles.metricLabel}>Precisión técnica</Text>
+          <View style={styles.deviceRow}>
+            <Ionicons name="hardware-chip-outline" size={14} color="#64748B" />
+            <Text style={styles.deviceText}>Progreso guardado en este dispositivo</Text>
           </View>
         </View>
 
-        {/* Insignias y Reconocimientos */}
-        <View style={styles.badgesSection}>
-          <Text style={styles.sectionTitle}>Insignias de Campo</Text>
-
-          {/* Insignia 1: Guardián de la Pruina */}
-          <View style={[styles.badgeCard, Shadows.sm]}>
-            <View style={[styles.badgeIconBox, { backgroundColor: '#E8F5E9' }]}>
-              <MaterialCommunityIcons name="shield-star" size={26} color="#1B5E20" />
-            </View>
-            <View style={styles.badgeInfo}>
-              <View style={styles.badgeTitleRow}>
-                <Text style={styles.badgeTitle}>Guardián de la Pruina</Text>
-                <View style={styles.unlockedTag}>
-                  <Text style={styles.unlockedTagText}>OBTENIDA</Text>
-                </View>
+        {/* Tarjeta de Insignia de Certificación */}
+        <View style={[styles.certCard, Shadows.md]}>
+          {/* Badge Gráfico Circular */}
+          <View style={styles.badgeGraphicWrapper}>
+            <View style={styles.outerBadgeCircle}>
+              <MaterialCommunityIcons name="fruit-grapes" size={32} color="#1D7A46" />
+              {/* Estrellita Dorada en la Esquina */}
+              <View style={styles.starBadgeCircle}>
+                <Ionicons name="star" size={11} color="#FFFFFF" />
               </View>
-              <Text style={styles.badgeDesc}>
-                Manipulación experta por pedúnculo sin contacto directo con las bayas.
-              </Text>
+            </View>
+            {/* Tag Inferior del Nivel Overlapping */}
+            <View style={styles.levelOverlayTag}>
+              <Ionicons name="checkmark" size={12} color="#15803D" style={{ marginRight: 2 }} />
+              <Text style={styles.levelOverlayText}>NIVEL 1</Text>
             </View>
           </View>
 
-          {/* Insignia 2: Corte de Precisión a 45° */}
-          <View style={[styles.badgeCard, Shadows.sm]}>
-            <View style={[styles.badgeIconBox, { backgroundColor: '#FEF3C7' }]}>
-              <MaterialCommunityIcons name="content-cut" size={26} color="#D97706" />
+          <Text style={styles.certRoleTitle}>Cosechador Certificado</Text>
+          <Text style={styles.certSpecialtyText}>
+            Especialidad: Manejo de Racimos y Tijeras de Raleo
+          </Text>
+
+          <View style={styles.badgeUnlockedTag}>
+            <MaterialCommunityIcons name="trophy-variant" size={14} color="#64748B" />
+            <Text style={styles.badgeUnlockedText}>Insignia desbloqueada hoy</Text>
+          </View>
+        </View>
+
+        {/* Sección: Resultados de la Evaluación */}
+        <View style={styles.resultsSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Resultados de la Evaluación</Text>
+            <Text style={styles.locationTag}>Fundo San Lorenzo • Piura</Text>
+          </View>
+
+          {/* Caja de Puntuación Total */}
+          <View style={[styles.totalScoreCard, Shadows.sm]}>
+            <View style={styles.starPurpleIconBox}>
+              <Ionicons name="star" size={22} color="#7E22CE" />
             </View>
-            <View style={styles.badgeInfo}>
-              <View style={styles.badgeTitleRow}>
-                <Text style={styles.badgeTitle}>Corte Limpio a 45°</Text>
-                <View style={styles.unlockedTag}>
-                  <Text style={styles.unlockedTagText}>OBTENIDA</Text>
-                </View>
+
+            <View style={styles.scoreTextBox}>
+              <Text style={styles.scoreLabelText}>PUNTUACIÓN TOTAL</Text>
+              <View style={styles.scoreNumberRow}>
+                <Text style={styles.scoreMainNum}>120</Text>
+                <Text style={styles.scoreSubNum}> / 120 pts</Text>
               </View>
-              <Text style={styles.badgeDesc}>
-                Uso ergonómico de tijeras de punta curva evitando daño periférico.
-              </Text>
+            </View>
+
+            <View style={styles.starsTripleRow}>
+              <Ionicons name="star" size={18} color="#EAB308" />
+              <Ionicons name="star" size={18} color="#EAB308" />
+              <Ionicons name="star" size={18} color="#EAB308" />
             </View>
           </View>
 
-          {/* Insignia 3: Calibración Maestra */}
-          <View style={[styles.badgeCard, Shadows.sm]}>
-            <View style={[styles.badgeIconBox, { backgroundColor: '#F3E8FF' }]}>
-              <MaterialCommunityIcons name="ruler-square" size={26} color="#7E22CE" />
-            </View>
-            <View style={styles.badgeInfo}>
-              <View style={styles.badgeTitleRow}>
-                <Text style={styles.badgeTitle}>Ojo Calibrador Red Globe</Text>
-                <View style={styles.progressTag}>
-                  <Text style={styles.progressTagText}>EN CAMINO</Text>
+          {/* Grid de 2 Métricas */}
+          <View style={styles.metricsGridRow}>
+            {/* Tarjeta 1: Precisión Técnica */}
+            <View style={[styles.metricSquareCard, Shadows.sm]}>
+              <View style={styles.metricTopRow}>
+                <View style={[styles.metricIconBox, { backgroundColor: '#DCFCE7' }]}>
+                  <MaterialCommunityIcons name="target" size={20} color="#16A34A" />
+                </View>
+                <View style={styles.metricPillTagGreen}>
+                  <Text style={styles.metricPillTextGreen}>5 de 5</Text>
                 </View>
               </View>
-              <Text style={styles.badgeDesc}>
-                Medición visual y calibrada de diámetro y grados Brix ideales para cosecha.
-              </Text>
+              <Text style={styles.metricBigValue}>100%</Text>
+              <Text style={styles.metricSubLabel}>Precisión técnica</Text>
+            </View>
+
+            {/* Tarjeta 2: Tiempo Invertido */}
+            <View style={[styles.metricSquareCard, Shadows.sm]}>
+              <View style={styles.metricTopRow}>
+                <View style={[styles.metricIconBox, { backgroundColor: '#F1F5F9' }]}>
+                  <Ionicons name="time-outline" size={20} color="#64748B" />
+                </View>
+                <View style={styles.metricPillTagGray}>
+                  <Text style={styles.metricPillTextGray}>Óptimo</Text>
+                </View>
+              </View>
+              <Text style={styles.metricBigValue}>6 min</Text>
+              <Text style={styles.metricSubLabel}>Tiempo invertido</Text>
             </View>
           </View>
+
+          {/* Card de Nivel 3 y Barra de Progreso */}
+          <View style={[styles.levelProgressCard, Shadows.sm]}>
+            <View style={styles.levelProgressHeader}>
+              <View style={styles.levelTitleRow}>
+                <FontAwesome5 name="trophy" size={14} color="#D97706" style={{ marginRight: 8 }} />
+                <Text style={styles.levelCardTitle}>Nivel 3: Cosechador Profesional</Text>
+              </View>
+              <Text style={styles.levelPointsText}>
+                {stats?.points ? `${stats.points} / 1000 pts` : '780 / 1000 pts'}
+              </Text>
+            </View>
+
+            {/* Barra de Progreso */}
+            <View style={styles.progressBarTrack}>
+              <View style={[styles.progressBarFill, { width: '78%' }]} />
+            </View>
+
+            <View style={styles.levelProgressFooter}>
+              <Text style={styles.levelFooterLeft}>Faltan 220 pts para ascenso a Inspector</Text>
+              <Text style={styles.levelFooterRight}>+120 pts hoy</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Sección: Tus Logros Acumulados */}
+        <View style={styles.logrosAcumuladosSection}>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Tus Logros Acumulados</Text>
+            <Text style={styles.locationTag}>2 de 3 completados</Text>
+          </View>
+
+          {/* Item 1: Maestro del corte */}
+          <View style={[styles.logroItemCard, Shadows.sm]}>
+            <View style={[styles.logroIconBox, { backgroundColor: '#1E4D2B' }]}>
+              <MaterialCommunityIcons name="content-cut" size={22} color="#FFFFFF" />
+            </View>
+            <View style={styles.logroContent}>
+              <Text style={styles.logroTitle}>Maestro del corte</Text>
+              <Text style={styles.logroDesc}>Corte limpio de pedúnculo sin dañar yema</Text>
+            </View>
+            <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
+          </View>
+
+          {/* Item 2: Protector de la pruina */}
+          <View style={[styles.logroItemCard, Shadows.sm]}>
+            <View style={[styles.logroIconBox, { backgroundColor: '#DCFCE7' }]}>
+              <MaterialCommunityIcons name="leaf" size={22} color="#16A34A" />
+            </View>
+            <View style={styles.logroContent}>
+              <Text style={styles.logroTitle}>Protector de la pruina</Text>
+              <Text style={styles.logroDesc}>Manipulación de racimos por el tallo</Text>
+            </View>
+            <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
+          </View>
+
+          {/* Item 3: Inspector de calidad */}
+          <View style={[styles.logroItemCard, Shadows.sm]}>
+            <View style={[styles.logroIconBox, { backgroundColor: '#F1F5F9' }]}>
+              <MaterialCommunityIcons name="shield-account-outline" size={22} color="#64748B" />
+            </View>
+            <View style={styles.logroContent}>
+              <View style={styles.lockTitleRow}>
+                <Text style={styles.logroTitle}>Inspector de calidad</Text>
+                <Ionicons name="lock-closed" size={14} color="#64748B" style={{ marginLeft: 4 }} />
+              </View>
+              <Text style={styles.logroDesc}>Detección de bayas ácidas o deshidratadas</Text>
+              {/* Mini progreso */}
+              <View style={styles.miniProgressTrack}>
+                <View style={[styles.miniProgressFill, { width: '40%' }]} />
+              </View>
+            </View>
+            <Text style={styles.logroProgressNum}>2 / 5</Text>
+          </View>
+        </View>
+
+        {/* Banner de Campo (Fase Activa de Campo) */}
+        <ImageBackground
+          source={require('@/assets/images/uvapro/hero.jpg')}
+          style={styles.fieldBannerBg}
+          imageStyle={{ borderRadius: Radius.xl }}
+        >
+          <View style={styles.fieldBannerOverlay}>
+            <View style={styles.fieldTagBadge}>
+              <Text style={styles.fieldTagText}>FASE ACTIVA DE CAMPO</Text>
+            </View>
+            <Text style={styles.fieldBannerText}>
+              La excelencia de exportación se logra racimo a racimo.
+            </Text>
+          </View>
+        </ImageBackground>
+
+        {/* Botones de Acción */}
+        <View style={styles.actionButtonsContainer}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.primaryBtn,
+              pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
+            ]}
+            onPress={handleNextModule}
+          >
+            <Text style={styles.primaryBtnText}>Seguir aprendiendo (Próximo módulo)</Text>
+            <Ionicons name="arrow-forward" size={18} color="#FFFFFF" style={{ marginLeft: 6 }} />
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [
+              styles.secondaryBtn,
+              pressed && { opacity: 0.8 },
+            ]}
+            onPress={handleShareCertificate}
+          >
+            <Ionicons name="share-outline" size={18} color="#0F172A" style={{ marginRight: 6 }} />
+            <Text style={styles.secondaryBtnText}>Compartir certificado con supervisor</Text>
+          </Pressable>
         </View>
       </ScrollView>
     </View>
@@ -151,7 +292,7 @@ export default function AchievementsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: '#F8FAFC',
   },
   scrollContent: {
     paddingHorizontal: Spacing.lg,
@@ -159,17 +300,17 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
     gap: Spacing.lg,
   },
-  header: {
+  topHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
   logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  logoIcon: {
+  logoIconBox: {
     width: 32,
     height: 32,
     borderRadius: Radius.sm,
@@ -177,138 +318,423 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoSub: {
+  logoBrand: {
     fontSize: 10,
     fontWeight: '800',
-    color: Colors.textMuted,
-    letterSpacing: 0.8,
+    color: Colors.primary,
+    letterSpacing: 1,
   },
-  logoTitle: {
+  screenTitle: {
     fontSize: 18,
     fontWeight: '800',
     color: Colors.textPrimary,
   },
-  heroCard: {
-    backgroundColor: Colors.primary,
+  successBannerContainer: {
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 6,
+  },
+  successPillTag: {
+    backgroundColor: '#DCFCE7',
+    paddingHorizontal: 14,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+  },
+  successPillText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#15803D',
+    letterSpacing: 0.5,
+  },
+  successHeading: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 2,
+  },
+  successSubtitle: {
+    fontSize: 13,
+    color: '#475569',
+    textAlign: 'center',
+    paddingHorizontal: Spacing.md,
+  },
+  deviceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  deviceText: {
+    fontSize: 12,
+    color: '#64748B',
+    fontWeight: '500',
+  },
+  certCard: {
+    backgroundColor: '#F4FBF7',
     borderRadius: Radius.xl,
     padding: Spacing.xl,
     alignItems: 'center',
-    gap: 6,
+    borderWidth: 1,
+    borderColor: '#DCFCE7',
+    gap: 8,
   },
-  medalCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.accentGold,
+  badgeGraphicWrapper: {
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  outerBadgeCircle: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    borderWidth: 3,
+    borderColor: Colors.primary,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 6,
+    position: 'relative',
   },
-  heroRank: {
-    fontSize: 20,
+  starBadgeCircle: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#EAB308',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  levelOverlayTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF08A',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+    marginTop: -12,
+    borderWidth: 1.5,
+    borderColor: '#FFFFFF',
+  },
+  levelOverlayText: {
+    fontSize: 10,
     fontWeight: '800',
-    color: '#FFFFFF',
+    color: '#15803D',
+    letterSpacing: 0.5,
   },
-  heroPoints: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: Colors.accentGold,
+  certRoleTitle: {
+    fontSize: 19,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  heroSub: {
+  certSpecialtyText: {
     fontSize: 12,
-    color: '#D8E8DC',
+    color: '#64748B',
     textAlign: 'center',
-    marginTop: 4,
   },
-  metricsGrid: {
+  badgeUnlockedTag: {
     flexDirection: 'row',
-    gap: Spacing.md,
-  },
-  metricCard: {
-    flex: 1,
-    backgroundColor: Colors.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
     alignItems: 'center',
-    gap: 4,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  metricValue: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: Colors.textPrimary,
+    gap: 6,
+    backgroundColor: '#F1F5F9',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
     marginTop: 4,
   },
-  metricLabel: {
+  badgeUnlockedText: {
     fontSize: 11,
-    color: Colors.textSecondary,
-    textAlign: 'center',
+    fontWeight: '700',
+    color: '#475569',
   },
-  badgesSection: {
+  resultsSection: {
     gap: Spacing.md,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: Colors.textPrimary,
-  },
-  badgeCard: {
-    backgroundColor: Colors.card,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    gap: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    alignItems: 'center',
-  },
-  badgeIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  badgeInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  badgeTitleRow: {
+  sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  badgeTitle: {
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  locationTag: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  totalScoreCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    gap: Spacing.md,
+  },
+  starPurpleIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F3E8FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scoreTextBox: {
+    flex: 1,
+  },
+  scoreLabelText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  scoreNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  scoreMainNum: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  scoreSubNum: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: '#64748B',
   },
-  unlockedTag: {
-    backgroundColor: '#E8F5E9',
+  starsTripleRow: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  metricsGridRow: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+  },
+  metricSquareCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    gap: 4,
+  },
+  metricTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  metricIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  metricPillTagGreen: {
+    backgroundColor: '#DCFCE7',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: Radius.full,
   },
-  unlockedTagText: {
-    fontSize: 10,
+  metricPillTextGreen: {
+    fontSize: 11,
     fontWeight: '800',
-    color: '#1B5E20',
+    color: '#15803D',
   },
-  progressTag: {
-    backgroundColor: '#FEF3C7',
+  metricPillTagGray: {
+    backgroundColor: '#F1F5F9',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: Radius.full,
   },
-  progressTagText: {
-    fontSize: 10,
+  metricPillTextGray: {
+    fontSize: 11,
     fontWeight: '800',
-    color: '#92400E',
+    color: '#475569',
   },
-  badgeDesc: {
+  metricBigValue: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginTop: 4,
+  },
+  metricSubLabel: {
     fontSize: 12,
-    color: Colors.textSecondary,
-    lineHeight: 16,
+    color: '#64748B',
+  },
+  levelProgressCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+    gap: 10,
+  },
+  levelProgressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  levelTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  levelCardTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  levelPointsText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#475569',
+  },
+  progressBarTrack: {
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#E2E8F0',
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    backgroundColor: '#CA8A04',
+    borderRadius: 4,
+  },
+  levelProgressFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  levelFooterLeft: {
+    fontSize: 11,
+    color: '#64748B',
+  },
+  levelFooterRight: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#16A34A',
+  },
+  logrosAcumuladosSection: {
+    gap: Spacing.md,
+  },
+  logroItemCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: Radius.lg,
+    padding: Spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.borderLight,
+  },
+  logroIconBox: {
+    width: 44,
+    height: 44,
+    borderRadius: Radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logroContent: {
+    flex: 1,
+    gap: 2,
+  },
+  logroTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  logroDesc: {
+    fontSize: 12,
+    color: '#64748B',
+  },
+  lockTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  miniProgressTrack: {
+    height: 4,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 2,
+    marginTop: 4,
+    width: '80%',
+    overflow: 'hidden',
+  },
+  miniProgressFill: {
+    height: '100%',
+    backgroundColor: Colors.primary,
+    borderRadius: 2,
+  },
+  logroProgressNum: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  fieldBannerBg: {
+    height: 110,
+    borderRadius: Radius.xl,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
+  },
+  fieldBannerOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    padding: Spacing.md,
+    justifyContent: 'space-between',
+  },
+  fieldTagBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: Radius.sm,
+  },
+  fieldTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#FCD34D',
+    letterSpacing: 0.5,
+  },
+  fieldBannerText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  actionButtonsContainer: {
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  primaryBtn: {
+    backgroundColor: Colors.primary,
+    height: 52,
+    borderRadius: Radius.full,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  primaryBtnText: {
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  secondaryBtn: {
+    backgroundColor: '#FFFFFF',
+    height: 52,
+    borderRadius: Radius.full,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  secondaryBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0F172A',
   },
 });

@@ -14,6 +14,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Shadows } from '@/constants/theme';
 import { dataService } from '@/services/dataService';
 import { ModuleItem } from '@/types';
+import PuraFruitHeaderLogo from '@/components/PuraFruitHeaderLogo';
 
 type CategoryFilter = 'all' | 'fundamentals' | 'cutting' | 'packaging';
 
@@ -56,15 +57,7 @@ export default function LearnScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <View style={styles.logoRow}>
-            <View style={styles.logoIcon}>
-              <MaterialCommunityIcons name="fruit-grapes" size={16} color="#FFFFFF" />
-            </View>
-            <View>
-              <Text style={styles.logoSub}>UVAPRO</Text>
-              <Text style={styles.logoTitle}>Aprender</Text>
-            </View>
-          </View>
+          <PuraFruitHeaderLogo size="md" title="Aprender" />
         </View>
 
         {/* Card Progreso Global */}

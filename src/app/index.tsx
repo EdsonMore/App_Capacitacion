@@ -13,6 +13,7 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Shadows } from '@/constants/theme';
+import PuraFruitHeaderLogo from '@/components/PuraFruitHeaderLogo';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -45,10 +46,7 @@ export default function WelcomeScreen() {
 
           {/* Top Bar con Pills */}
           <View style={styles.topHeader}>
-            <View style={styles.brandPill}>
-              <MaterialCommunityIcons name="leaf" size={18} color="#E5A93C" />
-              <Text style={styles.brandText}>UvaPro</Text>
-            </View>
+            <PuraFruitHeaderLogo size="lg" lightBackground={false} />
 
             <View style={styles.locationPill}>
               <View style={styles.locationDot} />
@@ -184,22 +182,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  brandPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255, 255, 255, 0.22)',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 7,
+  brandLogoWhitePill: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 5,
     borderRadius: Radius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  brandText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 16,
-    letterSpacing: 0.3,
+  heroLogoImage: {
+    width: 115,
+    height: 28,
   },
   locationPill: {
     flexDirection: 'row',

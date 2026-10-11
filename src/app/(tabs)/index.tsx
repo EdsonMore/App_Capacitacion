@@ -16,6 +16,7 @@ import { Colors, Radius, Spacing, Shadows } from '@/constants/theme';
 import { dataService } from '@/services/dataService';
 import { UserStats } from '@/types';
 import { SUPERVISOR_TIP } from '@/constants/mockData';
+import PuraFruitHeaderLogo from '@/components/PuraFruitHeaderLogo';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -68,15 +69,7 @@ export default function HomeScreen() {
       >
         {/* Top Header */}
         <View style={styles.header}>
-          <View style={styles.logoRow}>
-            <View style={styles.logoIcon}>
-              <MaterialCommunityIcons name="fruit-grapes" size={16} color="#FFFFFF" />
-            </View>
-            <View>
-              <Text style={styles.logoSub}>UVAPRO</Text>
-              <Text style={styles.logoTitle}>Inicio</Text>
-            </View>
-          </View>
+          <PuraFruitHeaderLogo size="md" title="Inicio" />
         </View>
 
         {/* Saludo y Fundo */}
