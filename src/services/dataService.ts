@@ -6,8 +6,11 @@ import {
   QUIZ_QUESTIONS_BY_ID,
   USER_STATS,
 } from '@/constants/mockData';
+import { supabase, isSupabaseConfigured } from '@/services/supabase';
 
 const STORAGE_KEYS = {
+  USER_DNI: '@purafruit_user_dni',
+  WORKER_NAME: '@purafruit_worker_name',
   USER_STATS: '@purafruit_user_stats',
   MODULES: '@purafruit_modules',
   COMPLETED_LESSONS: '@purafruit_completed_lessons',
@@ -26,20 +29,215 @@ async function readStringList(key: string): Promise<string[]> {
 }
 
 export const dataService = {
+  async getSavedDni(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(STORAGE_KEYS.USER_DNI);
+    } catch {
+      return null;
+    }
+  },
+
+  async getSavedWorkerName(): Promise<string | null> {
+    try {
+      return await AsyncStorage.getItem(STORAGE_KEYS.WORKER_NAME);
+    } catch {
+      return null;
+    }
+  },
+
+  async syncWithSupabaseByDni(dni: string): Promise<{ isNew: boolean; stats: UserStats }> {
+    const cleanDni = dni.trim().replace(/\D/g, '');
+    if (cleanDni.length !== 8) {
+      throw new Error('El DNI debe tener 8 dígitos.');
+    }
+
+    await AsyncStorage.setItem(STORAGE_KEYS.USER_DNI, cleanDni);
+
+    if (!isSupabaseConfigured || !supabase) {
+      const localStats = await this.getUserStats();
+      return { isNew: false, stats: { ...localStats, dni: cleanDni } };
+    }
+
+    try {
+      // 1. Validar si el trabajador existe en el padrón oficial de la empresa (tabla "Trabajador")
+      const { data: trabajador, error: errTrabajador } = await supabase
+        .from('Trabajador')
+        .select('dni, nombre, activo')
+        .eq('dni', cleanDni)
+        .maybeSingle();
+
+      if (errTrabajador) {
+        console.warn('Error consultando tabla Trabajador:', errTrabajador);
+      }
+
+      if (!trabajador) {
+        throw new Error('DNI no encontrado en el padrón de trabajadores de Pura Fruit. Consulta con tu supervisor.');
+      }
+
+      if (!trabajador.activo) {
+        throw new Error('El trabajador se encuentra en estado inactivo. Consulta con el área de recursos humanos.');
+      }
+
+      const realName = trabajador.nombre?.trim() || 'Operario de Campo';
+      await AsyncStorage.setItem(STORAGE_KEYS.WORKER_NAME, realName);
+
+      // 2. Buscar si ya tiene avance de capacitación registrado en "capacitacion_trabajador"
+      const { data: capacitacion, error: errCap } = await supabase
+        .from('capacitacion_trabajador')
+        .select('*')
+        .eq('dni_trabajador', cleanDni)
+        .maybeSingle();
+
+      if (errCap && errCap.code !== 'PGRST116') {
+        console.warn('Error consultando capacitacion_trabajador:', errCap);
+      }
+
+      if (capacitacion) {
+        // Trabajador con avance previo: restauramos sus puntos y módulos
+        const remoteStats: UserStats = {
+          dni: cleanDni,
+          workerName: realName,
+          streakDays: capacitacion.streak_days ?? 1,
+          streakText: capacitacion.streak_text ?? 'Día 1',
+          points: capacitacion.points ?? 0,
+          pointsDeltaText: capacitacion.points_delta_text ?? '+0 hoy',
+          routeProgressPercent: capacitacion.route_progress_percent ?? 0,
+          routeLessonsText: capacitacion.route_lessons_text ?? '0/20 lecc.',
+          overallHarvestProgressPercent: capacitacion.overall_harvest_progress_percent ?? 0,
+          currentFarmName: 'FUNDO LOS VALLES',
+        };
+
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_STATS, JSON.stringify(remoteStats));
+
+        if (Array.isArray(capacitacion.completed_lessons)) {
+          await AsyncStorage.setItem(STORAGE_KEYS.COMPLETED_LESSONS, JSON.stringify(capacitacion.completed_lessons));
+        }
+        if (Array.isArray(capacitacion.completed_quizzes)) {
+          await AsyncStorage.setItem(STORAGE_KEYS.COMPLETED_QUIZZES, JSON.stringify(capacitacion.completed_quizzes));
+        }
+        if (Array.isArray(capacitacion.completed_modules) && capacitacion.completed_modules.length > 0) {
+          const remoteModules = capacitacion.completed_modules as { id: string; status: any; scoreText?: string }[];
+          const currentModules = await this.getModules();
+          const mergedModules = currentModules.map((m) => {
+            const found = remoteModules.find((rm) => rm.id === m.id);
+            return found ? { ...m, ...found } : m;
+          });
+          await AsyncStorage.setItem(STORAGE_KEYS.MODULES, JSON.stringify(mergedModules));
+        }
+
+        return { isNew: false, stats: remoteStats };
+      } else {
+        // Trabajador oficial sin capacitación previa: inicializamos desde cero
+        const initialStats: UserStats = {
+          dni: cleanDni,
+          workerName: realName,
+          streakDays: 1,
+          streakText: 'Día 1',
+          points: 0,
+          pointsDeltaText: '+0 hoy',
+          routeProgressPercent: 0,
+          routeLessonsText: '0/20 lecc.',
+          overallHarvestProgressPercent: 0,
+          currentFarmName: 'FUNDO LOS VALLES',
+        };
+
+        await AsyncStorage.setItem(STORAGE_KEYS.USER_STATS, JSON.stringify(initialStats));
+
+        const cleanModules: ModuleItem[] = MODULES_LIST.map((m, index) => ({
+          ...m,
+          status: index === 0 ? 'available' : 'locked',
+          statusText: index === 0 ? 'Disponible' : 'Bloqueado',
+          progressPercent: 0,
+          progressText: `0 de ${m.lessonsText}`,
+          scoreText: undefined,
+        }));
+        await AsyncStorage.setItem(STORAGE_KEYS.MODULES, JSON.stringify(cleanModules));
+        await AsyncStorage.multiRemove([STORAGE_KEYS.COMPLETED_LESSONS, STORAGE_KEYS.COMPLETED_QUIZZES]);
+
+        // Guardamos su registro inicial en la base de datos
+        await supabase.from('capacitacion_trabajador').upsert({
+          dni_trabajador: cleanDni,
+          points: 0,
+          streak_days: 1,
+          streak_text: 'Día 1',
+          points_delta_text: '+0 hoy',
+          route_progress_percent: 0,
+          route_lessons_text: '0/20 lecc.',
+          overall_harvest_progress_percent: 0,
+          completed_modules: cleanModules.map((m) => ({ id: m.id, status: m.status })),
+          completed_lessons: [],
+          completed_quizzes: [],
+          last_active: new Date().toISOString(),
+        });
+
+        return { isNew: true, stats: initialStats };
+      }
+    } catch (e: any) {
+      console.warn('Error in syncWithSupabaseByDni:', e);
+      throw e;
+    }
+  },
+
+  async pushToSupabase(): Promise<void> {
+    if (!isSupabaseConfigured || !supabase) return;
+    try {
+      const dni = await this.getSavedDni();
+      if (!dni) return;
+
+      const [stats, modules, completedLessons, completedQuizzes] = await Promise.all([
+        this.getUserStats(),
+        this.getModules(),
+        readStringList(STORAGE_KEYS.COMPLETED_LESSONS),
+        readStringList(STORAGE_KEYS.COMPLETED_QUIZZES),
+      ]);
+
+      await supabase.from('capacitacion_trabajador').upsert({
+        dni_trabajador: dni,
+        points: stats.points,
+        streak_days: stats.streakDays,
+        streak_text: stats.streakText,
+        points_delta_text: stats.pointsDeltaText,
+        route_progress_percent: stats.routeProgressPercent,
+        route_lessons_text: stats.routeLessonsText,
+        overall_harvest_progress_percent: stats.overallHarvestProgressPercent,
+        completed_modules: modules.map((m) => ({ id: m.id, status: m.status, scoreText: m.scoreText })),
+        completed_lessons: completedLessons,
+        completed_quizzes: completedQuizzes,
+        last_active: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.warn('Error pushing update to Supabase:', e);
+    }
+  },
+
   async getUserStats(): Promise<UserStats> {
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEYS.USER_STATS);
-      if (raw) return { ...USER_STATS, ...(JSON.parse(raw) as Partial<UserStats>) };
+      const [raw, dni, workerName] = await Promise.all([
+        AsyncStorage.getItem(STORAGE_KEYS.USER_STATS),
+        this.getSavedDni(),
+        this.getSavedWorkerName(),
+      ]);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Partial<UserStats>;
+        return {
+          ...USER_STATS,
+          ...parsed,
+          dni: dni || parsed.dni,
+          workerName: workerName || parsed.workerName || 'Operario de Campo',
+        };
+      }
+      return { ...USER_STATS, dni: dni || undefined, workerName: workerName || 'Operario de Campo' };
     } catch (e) {
       console.warn('Error fetching user stats:', e);
+      return USER_STATS;
     }
-    return USER_STATS;
   },
 
   async updateUserStats(partial: Partial<UserStats>): Promise<UserStats> {
     const current = await this.getUserStats();
     const updated: UserStats = { ...current, ...partial };
     await AsyncStorage.setItem(STORAGE_KEYS.USER_STATS, JSON.stringify(updated));
+    this.pushToSupabase().catch(() => {});
     return updated;
   },
 
@@ -58,6 +256,7 @@ export const dataService = {
     }
     return MODULES_LIST;
   },
+
 
   async getLesson(id: string): Promise<Lesson> {
     let lesson = Object.values(LESSONS_BY_MODULE_ID).find((item) => item.id === id);

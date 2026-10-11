@@ -70,6 +70,8 @@ export interface QuizQuestion {
 }
 
 export interface UserStats {
+  dni?: string;
+  workerName?: string;
   streakDays: number;
   streakText: string;
   points: number;
@@ -79,3 +81,4 @@ export interface UserStats {
   overallHarvestProgressPercent: number;
   currentFarmName: string;
 }
+

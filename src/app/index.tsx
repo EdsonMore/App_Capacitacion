@@ -183,11 +183,16 @@ export default function WelcomeScreen() {
           </View>
         </View>
 
-        {/* UNIVERSAL BANNER */}
+        {/* UNIVERSAL BANNER CON IDENTIFICACIÓN POR DNI */}
         <View style={styles.universalBanner}>
           <MaterialCommunityIcons name="shield-check-outline" size={18} color={Colors.primary} />
           <Text style={styles.universalBannerText}>
-            <Text style={styles.universalBannerBold}>Acceso directo y universal:</Text> Sin registro obligatorio ni contraseñas complejas. Diseñado para la cuadrilla en campo.
+            <Text style={styles.universalBannerBold}>
+              {userStats?.dni ? `Trabajador DNI ${userStats.dni} activo:` : 'Acceso por DNI:'}
+            </Text>{' '}
+            {userStats?.dni
+              ? 'Tu progreso está sincronizado con la base de datos de Pura Fruit.'
+              : 'Sin contraseñas difíciles. Ingresa tu DNI para no perder tu avance si sales del sistema.'}
           </Text>
         </View>
 

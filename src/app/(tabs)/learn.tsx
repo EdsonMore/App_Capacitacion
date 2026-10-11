@@ -17,6 +17,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { notify } from '@/utils/notify';
 import { Colors, Radius, Spacing } from '@/constants/theme';
 import PuraFruitHeaderLogo from '@/components/PuraFruitHeaderLogo';
+import WorkerDniModal from '@/components/WorkerDniModal';
 import { dataService } from '@/services/dataService';
 import { ModuleItem, UserStats } from '@/types';
 
@@ -53,6 +54,7 @@ export default function LearnScreen() {
   const [searchQuery, setSearchQuery] = useState('');
   const [modules, setModules] = useState<ModuleItem[]>([]);
   const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [dniModalVisible, setDniModalVisible] = useState(false);
 
   const filters: FilterTab[] = [
     'Todos (5)',
@@ -213,21 +215,23 @@ export default function LearnScreen() {
                 <Text style={styles.navPointsSub}>Pts</Text>
               </View>
             </View>
-            {isDesktop && (
-              <View style={styles.navProfile}>
-                <View style={{alignItems:'flex-end', marginRight: 8}}>
-                  <Text style={styles.navProfileName}>Operario de Campo</Text>
-                  <Text style={styles.navProfileStatus}>Offline Listo • Fundo 34</Text>
-                </View>
-                <Pressable
-                  style={styles.navAvatar}
-                  onPress={handleResetProgress}
-                  accessibilityLabel="Restablecer progreso del operario"
-                >
-                  <Ionicons name="refresh" size={16} color="#FFFFFF" />
-                </Pressable>
+            <Pressable
+              style={styles.navProfile}
+              onPress={() => setDniModalVisible(true)}
+              accessibilityLabel="Identificación por DNI del trabajador"
+            >
+              <View style={{ alignItems: 'flex-end', marginRight: 8 }}>
+                <Text style={styles.navProfileName} numberOfLines={1}>
+                  {userStats?.workerName || 'Operario de Campo'}
+                </Text>
+                <Text style={styles.navProfileStatus}>
+                  {userStats?.dni ? `DNI: ${userStats.dni} • Sincronizado` : 'Vincular DNI • Guardar avance'}
+                </Text>
               </View>
-            )}
+              <View style={styles.navAvatar}>
+                <Ionicons name={userStats?.dni ? 'person' : 'id-card-outline'} size={16} color="#FFFFFF" />
+              </View>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -271,14 +275,26 @@ export default function LearnScreen() {
                   </View>
                 </View>
 
-                {/* BOTÓN RESTABLECER PROGRESO */}
-                <Pressable
-                  style={styles.resetButtonRow}
-                  onPress={handleResetProgress}
-                >
-                  <Ionicons name="reload-circle-outline" size={16} color="#D97706" />
-                  <Text style={styles.resetButtonText}>Restablecer para nuevo operario (0%)</Text>
-                </Pressable>
+                {/* BOTONES DE IDENTIFICACIÓN Y GESTIÓN */}
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                  <Pressable
+                    style={[styles.resetButtonRow, { flex: 1.2, backgroundColor: '#E8F5E9', borderColor: '#81C784' }]}
+                    onPress={() => setDniModalVisible(true)}
+                  >
+                    <Ionicons name="id-card-outline" size={15} color="#1D7A46" />
+                    <Text style={[styles.resetButtonText, { color: '#1D7A46' }]}>
+                      {userStats?.dni ? `DNI: ${userStats.dni} (Cambiar)` : 'Ingresar mi DNI'}
+                    </Text>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.resetButtonRow, { flex: 1 }]}
+                    onPress={handleResetProgress}
+                  >
+                    <Ionicons name="reload-circle-outline" size={15} color="#D97706" />
+                    <Text style={styles.resetButtonText}>Reiniciar 0%</Text>
+                  </Pressable>
+                </View>
               </View>
             </View>
           </View>
@@ -540,6 +556,22 @@ export default function LearnScreen() {
         </View>
 
       </ScrollView>
+
+      {/* Modal para ingresar DNI y sincronizar avance */}
+      <WorkerDniModal
+        visible={dniModalVisible}
+        currentDni={userStats?.dni}
+        currentWorkerName={userStats?.workerName}
+        onClose={() => setDniModalVisible(false)}
+        onSuccess={(updatedStats) => {
+          setUserStats(updatedStats);
+          loadData();
+          notify(
+            '¡Trabajador Identificado!',
+            `Avance vinculado al DNI ${updatedStats.dni}. Tus progresos y evaluaciones están guardados en la nube.`
+          );
+        }}
+      />
     </View>
   );
 }
