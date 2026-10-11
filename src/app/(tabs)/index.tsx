@@ -14,19 +14,24 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Shadows } from '@/constants/theme';
 import { dataService } from '@/services/dataService';
-import { UserStats } from '@/types';
+import { ModuleItem, UserStats } from '@/types';
 import { SUPERVISOR_TIP } from '@/constants/mockData';
 import PuraFruitHeaderLogo from '@/components/PuraFruitHeaderLogo';
 
 export default function HomeScreen() {
   const router = useRouter();
   const [stats, setStats] = useState<UserStats | null>(null);
+  const [currentModule, setCurrentModule] = useState<ModuleItem | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
-      const userStats = await dataService.getUserStats();
+      const [userStats, modules] = await Promise.all([
+        dataService.getUserStats(),
+        dataService.getModules(),
+      ]);
       setStats(userStats);
+      setCurrentModule(modules.find((module) => module.id === 'mod-2') ?? null);
     } catch (e) {
       console.warn('Error loading home data:', e);
     }
@@ -55,6 +60,9 @@ export default function HomeScreen() {
   const handleViewAllModules = () => {
     router.push('/(tabs)/learn' as any);
   };
+
+  const isCurrentModuleCompleted = currentModule?.status === 'completed';
+  const currentModuleProgress = currentModule?.progressPercent ?? 66;
 
   return (
     <View style={styles.screen}>
@@ -264,8 +272,17 @@ export default function HomeScreen() {
             {/* Módulo 2: En Progreso */}
             <View style={styles.timelineItem}>
               <View style={styles.timelineMarkerContainer}>
-                <View style={[styles.timelineNode, { backgroundColor: Colors.accentGold }]}>
-                  <Ionicons name="play" size={12} color="#0E3A28" />
+                <View
+                  style={[
+                    styles.timelineNode,
+                    { backgroundColor: isCurrentModuleCompleted ? '#135832' : Colors.accentGold },
+                  ]}
+                >
+                  <Ionicons
+                    name={isCurrentModuleCompleted ? 'checkmark' : 'play'}
+                    size={12}
+                    color={isCurrentModuleCompleted ? '#FFFFFF' : '#0E3A28'}
+                  />
                 </View>
                 <View style={styles.timelineLine} />
               </View>
@@ -273,9 +290,16 @@ export default function HomeScreen() {
               <View style={[styles.moduleCard, styles.moduleCardActive, Shadows.md]}>
                 <View style={styles.moduleCardHeader}>
                   <Text style={styles.moduleCardNumber}>MÓDULO 2 •</Text>
-                  <View style={styles.inProgressBadge}>
-                    <Text style={styles.inProgressBadgeText}>En progreso</Text>
-                  </View>
+                  {isCurrentModuleCompleted ? (
+                    <View style={styles.completedBadge}>
+                      <Ionicons name="checkmark-circle-outline" size={14} color="#1D7A46" />
+                      <Text style={styles.completedBadgeText}>Completado</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.inProgressBadge}>
+                      <Text style={styles.inProgressBadgeText}>En progreso</Text>
+                    </View>
+                  )}
                 </View>
 
                 <Text style={styles.moduleCardTitle}>Identifica el punto correcto de cosecha</Text>
@@ -285,18 +309,27 @@ export default function HomeScreen() {
 
                 <View style={styles.moduleProgressBarContainer}>
                   <View style={styles.moduleProgressBarHeader}>
-                    <Text style={styles.moduleProgressText}>2 de 3 lecciones completadas</Text>
-                    <Text style={styles.moduleProgressPercent}>66%</Text>
+                    <Text style={styles.moduleProgressText}>
+                      {currentModule?.progressText ?? '2 de 3 lecciones completadas'}
+                    </Text>
+                    <Text style={styles.moduleProgressPercent}>{currentModuleProgress}%</Text>
                   </View>
                   <View style={styles.moduleProgressBarTrack}>
-                    <View style={[styles.moduleProgressBarFill, { width: '66%' }]} />
+                    <View
+                      style={[
+                        styles.moduleProgressBarFill,
+                        { width: `${currentModuleProgress}%` },
+                      ]}
+                    />
                   </View>
                 </View>
 
                 <View style={styles.moduleCardFooterActive}>
                   <View style={styles.timeRow}>
                     <Ionicons name="time-outline" size={15} color={Colors.textSecondary} />
-                    <Text style={styles.timeText}>Siguiente: 3 min</Text>
+                    <Text style={styles.timeText}>
+                      {isCurrentModuleCompleted ? 'Lección finalizada' : 'Siguiente: 3 min'}
+                    </Text>
                   </View>
 
                   <Pressable
@@ -306,7 +339,9 @@ export default function HomeScreen() {
                     ]}
                     onPress={() => handleOpenLesson('lesson-2-2')}
                   >
-                    <Text style={styles.resumeButtonText}>Reanudar</Text>
+                    <Text style={styles.resumeButtonText}>
+                      {isCurrentModuleCompleted ? 'Repasar' : 'Reanudar'}
+                    </Text>
                     <Ionicons name="arrow-forward" size={14} color="#FFFFFF" />
                   </Pressable>
                 </View>

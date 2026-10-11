@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -10,44 +10,106 @@ import {
   StatusBar,
   Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Shadows } from '@/constants/theme';
-import { QUIZ_QUESTION_DEMO } from '@/constants/mockData';
 import { dataService } from '@/services/dataService';
+import { QuizQuestion } from '@/types';
 
 export default function QuizScreen() {
   const router = useRouter();
-  const [selectedOptionId, setSelectedOptionId] = useState<string | null>('opt-b');
-  const [isAnswerChecked, setIsAnswerChecked] = useState(true);
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [questionIndex, setQuestionIndex] = useState(0);
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
+  const [isAnswerChecked, setIsAnswerChecked] = useState(false);
+  const [answers, setAnswers] = useState<boolean[]>([]);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [earnedPoints, setEarnedPoints] = useState(0);
+  const [correctAnswers, setCorrectAnswers] = useState(0);
+  const submissionInProgress = useRef(false);
 
-  const question = QUIZ_QUESTION_DEMO;
-  const isCorrect = selectedOptionId === question.correctOptionId;
+  useEffect(() => {
+    let isActive = true;
+    dataService.getQuizQuestions(String(id ?? '')).then((data) => {
+      if (isActive) setQuestions(data);
+    }).catch((error) => {
+      console.warn('Error loading quiz:', error);
+      if (isActive) {
+        Alert.alert('Evaluación no disponible', 'No se encontró esta evaluación de demostración.');
+        router.back();
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [id, router]);
+
+  const question = questions[questionIndex];
+  const isCorrect = selectedOptionId === question?.correctOptionId;
+  const totalPoints = questions.reduce((total, item) => total + item.feedback.points, 0);
 
   const handleSelectOption = (optionId: string) => {
     if (hasSubmitted) return;
     setSelectedOptionId(optionId);
-    setIsAnswerChecked(true);
+    setIsAnswerChecked(false);
   };
 
   const handleContinue = async () => {
-    if (!hasSubmitted && isCorrect) {
-      setHasSubmitted(true);
-      await dataService.recordQuizSuccess(question.feedback.points);
+    if (hasSubmitted) {
+      router.replace('/(tabs)' as any);
+      return;
+    }
+    if (!question) return;
+
+    if (!selectedOptionId) {
+      Alert.alert('Elige una respuesta', 'Selecciona una opción para continuar con la evaluación.');
+      return;
     }
 
-    Alert.alert(
-      '¡Evaluación Completada!',
-      `Has sumado +${question.feedback.points} puntos a tu récord del Fundo Los Valles cumpliendo el estándar GlobalG.A.P.`,
-      [
-        {
-          text: 'Volver al Inicio',
-          onPress: () => router.replace('/(tabs)' as any),
-        },
-      ]
+    if (!isAnswerChecked) {
+      setIsAnswerChecked(true);
+      setAnswers((previous) => {
+        const updated = [...previous];
+        updated[questionIndex] = isCorrect;
+        return updated;
+      });
+      if (!isCorrect) {
+        Alert.alert('Respuesta incorrecta', 'Puedes continuar; esta pregunta no suma puntos.');
+      }
+      return;
+    }
+
+    if (questionIndex < questions.length - 1) {
+      setQuestionIndex((index) => index + 1);
+      setSelectedOptionId(null);
+      setIsAnswerChecked(false);
+      return;
+    }
+
+    if (submissionInProgress.current) return;
+
+    const finalPoints = questions.reduce(
+      (points, item, index) => points + (answers[index] ? item.feedback.points : 0),
+      0
     );
+    const finalCorrectAnswers = answers.filter(Boolean).length;
+    submissionInProgress.current = true;
+    try {
+      await dataService.recordQuizSuccess(question.quizId, finalPoints);
+      setEarnedPoints(finalPoints);
+      setCorrectAnswers(finalCorrectAnswers);
+      setHasSubmitted(true);
+    } catch (error) {
+      submissionInProgress.current = false;
+      console.warn('Error saving quiz result:', error);
+      Alert.alert('No se pudo guardar', 'Vuelve a intentarlo en unos momentos.');
+      return;
+    }
   };
+
+  if (!question) return <View style={styles.screen} />;
 
   return (
     <View style={styles.screen}>
@@ -69,7 +131,7 @@ export default function QuizScreen() {
 
         <View style={styles.counterPill}>
           <Text style={styles.counterText}>
-            {question.questionNumber} / {question.totalQuestions}
+            {hasSubmitted ? 'Resultado' : `${question.questionNumber} / ${questions.length}`}
           </Text>
         </View>
       </View>
@@ -88,6 +150,34 @@ export default function QuizScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {hasSubmitted ? (
+          <View style={[styles.feedbackCard, Shadows.md]}>
+            <View style={styles.feedbackHeaderRow}>
+              <View style={styles.leafIconCircle}>
+                <MaterialCommunityIcons name="trophy-award" size={20} color="#1D7A46" />
+              </View>
+              <View style={styles.feedbackTitleCol}>
+                <Text style={styles.feedbackTitle}>¡Evaluación completada!</Text>
+                <Text style={styles.feedbackSubtitle}>
+                  {correctAnswers} de {questions.length} respuestas correctas
+                </Text>
+              </View>
+              <View style={styles.pointsPill}>
+                <Text style={styles.pointsPillText}>{earnedPoints}</Text>
+                <Text style={styles.pointsPillUnit}>pts</Text>
+              </View>
+            </View>
+            <Text style={styles.feedbackExplanation}>
+              Resultado: {totalPoints > 0 ? Math.round((earnedPoints / totalPoints) * 100) : 0}%.
+              {' '}Los puntos se guardaron en este dispositivo.
+            </Text>
+            <View style={styles.standardTag}>
+              <MaterialCommunityIcons name="shield-check" size={14} color="#1D7A46" />
+              <Text style={styles.standardTagText}>Puntaje máximo: {totalPoints} pts</Text>
+            </View>
+          </View>
+        ) : (
+          <>
         {/* Pills de Contexto de Campo */}
         <View style={styles.pillsRow}>
           <View style={styles.categoryPill}>
@@ -129,8 +219,8 @@ export default function QuizScreen() {
                 key={option.id}
                 style={({ pressed }) => [
                   styles.optionCard,
-                  isSelected && isOptionCorrect && styles.optionCardCorrect,
-                  isSelected && !isOptionCorrect && styles.optionCardWrong,
+                  isAnswerChecked && isSelected && isOptionCorrect && styles.optionCardCorrect,
+                  isAnswerChecked && isSelected && !isOptionCorrect && styles.optionCardWrong,
                   pressed && { opacity: 0.9 },
                   Shadows.sm,
                 ]}
@@ -139,13 +229,13 @@ export default function QuizScreen() {
                 <View
                   style={[
                     styles.letterCircle,
-                    isSelected && isOptionCorrect && styles.letterCircleCorrect,
+                    isAnswerChecked && isSelected && isOptionCorrect && styles.letterCircleCorrect,
                   ]}
                 >
                   <Text
                     style={[
                       styles.letterText,
-                      isSelected && isOptionCorrect && styles.letterTextCorrect,
+                      isAnswerChecked && isSelected && isOptionCorrect && styles.letterTextCorrect,
                     ]}
                   >
                     {option.letter}
@@ -157,10 +247,15 @@ export default function QuizScreen() {
                 <View
                   style={[
                     styles.selectionCircle,
-                    isSelected && isOptionCorrect && styles.selectionCircleCorrect,
+                    isSelected && isAnswerChecked && isOptionCorrect && styles.selectionCircleCorrect,
+                    isSelected && isAnswerChecked && !isOptionCorrect && styles.selectionCircleWrong,
+                    isSelected && !isAnswerChecked && styles.selectionCircleSelected,
                   ]}
                 >
-                  {isSelected && isOptionCorrect && (
+                  {isSelected && !isAnswerChecked && (
+                    <Ionicons name="ellipse" size={10} color="#FFFFFF" />
+                  )}
+                  {isSelected && isAnswerChecked && isOptionCorrect && (
                     <Ionicons name="checkmark" size={14} color="#FFFFFF" />
                   )}
                 </View>
@@ -196,6 +291,8 @@ export default function QuizScreen() {
             </View>
           </View>
         )}
+          </>
+        )}
       </ScrollView>
 
       {/* Botón Inferior Fijo */}
@@ -207,8 +304,20 @@ export default function QuizScreen() {
           ]}
           onPress={handleContinue}
         >
-          <Text style={styles.continueButtonText}>Continuar a la siguiente pregunta</Text>
-          <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
+          <Text style={styles.continueButtonText}>
+            {hasSubmitted
+              ? 'Volver al inicio'
+              : !selectedOptionId || !isAnswerChecked
+                ? 'Comprobar respuesta'
+                : questionIndex === questions.length - 1
+                  ? 'Ver resultado'
+                  : 'Siguiente pregunta'}
+          </Text>
+          <Ionicons
+            name={hasSubmitted ? 'home-outline' : 'arrow-forward'}
+            size={18}
+            color="#FFFFFF"
+          />
         </Pressable>
       </View>
     </View>
@@ -400,6 +509,12 @@ const styles = StyleSheet.create({
   },
   selectionCircleCorrect: {
     backgroundColor: '#1B5E20',
+  },
+  selectionCircleWrong: {
+    backgroundColor: '#B91C1C',
+  },
+  selectionCircleSelected: {
+    backgroundColor: Colors.primary,
   },
   feedbackCard: {
     backgroundColor: '#EDF6EF',

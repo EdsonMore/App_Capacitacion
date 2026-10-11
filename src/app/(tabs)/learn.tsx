@@ -12,8 +12,9 @@ import {
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Shadows } from '@/constants/theme';
+import { LESSONS_BY_MODULE_ID } from '@/constants/mockData';
 import { dataService } from '@/services/dataService';
-import { ModuleItem } from '@/types';
+import { ModuleItem, UserStats } from '@/types';
 import PuraFruitHeaderLogo from '@/components/PuraFruitHeaderLogo';
 
 type CategoryFilter = 'all' | 'fundamentals' | 'cutting' | 'packaging';
@@ -21,12 +22,17 @@ type CategoryFilter = 'all' | 'fundamentals' | 'cutting' | 'packaging';
 export default function LearnScreen() {
   const router = useRouter();
   const [modules, setModules] = useState<ModuleItem[]>([]);
+  const [stats, setStats] = useState<UserStats | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>('all');
 
   const loadModules = useCallback(async () => {
     try {
-      const list = await dataService.getModules();
+      const [list, userStats] = await Promise.all([
+        dataService.getModules(),
+        dataService.getUserStats(),
+      ]);
       setModules(list);
+      setStats(userStats);
     } catch (e) {
       console.warn('Error loading modules:', e);
     }
@@ -44,8 +50,11 @@ export default function LearnScreen() {
   });
 
   const handleOpenLesson = (moduleId: string) => {
-    router.push('/lesson/lesson-2-2' as any);
+    const lesson = LESSONS_BY_MODULE_ID[moduleId];
+    router.push(`/lesson/${lesson.id}` as any);
   };
+
+  const progressPercent = stats?.routeProgressPercent ?? 45;
 
   return (
     <View style={styles.screen}>
@@ -71,13 +80,15 @@ export default function LearnScreen() {
               <Text style={styles.globalProgressTitle}>Ruta de Certificación</Text>
             </View>
             <View style={styles.globalProgressStats}>
-              <Text style={styles.globalProgressPercent}>40%</Text>
-              <Text style={styles.globalProgressModules}>2 de 5 Módulos</Text>
+              <Text style={styles.globalProgressPercent}>{progressPercent}%</Text>
+              <Text style={styles.globalProgressModules}>
+                {stats?.routeLessonsText ?? '9/20 lecc.'}
+              </Text>
             </View>
           </View>
 
           <View style={styles.progressBarTrack}>
-            <View style={[styles.progressBarFill, { width: '40%' }]} />
+            <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
           </View>
         </View>
 
@@ -232,11 +243,16 @@ export default function LearnScreen() {
                 {item.status === 'in_progress' && (
                   <View style={styles.inProgressProgressBox}>
                     <View style={styles.inProgressHeaderRow}>
-                      <Text style={styles.inProgressLabel}>Lección 2 de 3</Text>
-                      <Text style={styles.inProgressPercent}>65%</Text>
+                      <Text style={styles.inProgressLabel}>{item.progressText}</Text>
+                      <Text style={styles.inProgressPercent}>{item.progressPercent}%</Text>
                     </View>
                     <View style={styles.moduleProgressBarTrack}>
-                      <View style={[styles.moduleProgressBarFill, { width: '65%' }]} />
+                      <View
+                        style={[
+                          styles.moduleProgressBarFill,
+                          { width: `${item.progressPercent ?? 0}%` },
+                        ]}
+                      />
                     </View>
                   </View>
                 )}

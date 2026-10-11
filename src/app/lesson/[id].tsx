@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -9,19 +9,38 @@ import {
   Platform,
   StatusBar,
   Linking,
+  Alert,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Shadows } from '@/constants/theme';
-import { CURRENT_LESSON } from '@/constants/mockData';
 import { dataService } from '@/services/dataService';
+import { Lesson } from '@/types';
 
 export default function LessonDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const [lesson, setLesson] = useState<Lesson | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1.0x' | '1.25x' | '1.5x'>('1.0x');
   const [isMuted, setIsMuted] = useState(false);
+
+  useEffect(() => {
+    let isActive = true;
+    dataService.getLesson(String(id ?? '')).then((data) => {
+      if (isActive) setLesson(data);
+    }).catch((error) => {
+      console.warn('Error loading lesson:', error);
+      if (isActive) {
+        Alert.alert('Lección no disponible', 'No se encontró esta lección de demostración.');
+        router.back();
+      }
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [id, router]);
 
   const toggleSpeed = () => {
     if (playbackSpeed === '1.0x') setPlaybackSpeed('1.25x');
@@ -30,9 +49,17 @@ export default function LessonDetailScreen() {
   };
 
   const handleFinishLesson = async () => {
-    await dataService.completeLesson(String(id || CURRENT_LESSON.id));
-    router.push(`/quiz/${CURRENT_LESSON.quizId}` as any);
+    if (!lesson) return;
+    try {
+      await dataService.completeLesson(lesson.id);
+      router.push(`/quiz/${lesson.quizId}` as any);
+    } catch (error) {
+      console.warn('Error completing lesson:', error);
+      Alert.alert('No se pudo guardar', 'Vuelve a intentarlo en unos momentos.');
+    }
   };
+
+  if (!lesson) return <View style={styles.screen} />;
 
   return (
     <View style={styles.screen}>
@@ -65,25 +92,25 @@ export default function LessonDetailScreen() {
         <View style={styles.moduleMetaRow}>
           <View style={styles.moduleNumberPill}>
             <View style={styles.numberCircle}>
-              <Text style={styles.numberCircleText}>{CURRENT_LESSON.lessonNumber}</Text>
+              <Text style={styles.numberCircleText}>{lesson.lessonNumber}</Text>
             </View>
             <Text style={styles.moduleMetaText}>
-              {CURRENT_LESSON.moduleTitle} • Lección {CURRENT_LESSON.lessonNumber} de {CURRENT_LESSON.totalLessons}
+              {lesson.moduleTitle} • Lección {lesson.lessonNumber} de {lesson.totalLessons}
             </Text>
           </View>
 
           <View style={styles.pointsBadge}>
             <Ionicons name="flash" size={14} color="#D97706" />
-            <Text style={styles.pointsBadgeText}>+{CURRENT_LESSON.pointsReward} pts</Text>
+            <Text style={styles.pointsBadgeText}>+{lesson.pointsReward} pts</Text>
           </View>
         </View>
 
         {/* Reproductor de Video (YouTube o Simulación) */}
         <View style={[styles.videoPlayerContainer, Shadows.lg]}>
-          {CURRENT_LESSON.youtubeId && Platform.OS === 'web' ? (
+          {lesson.youtubeId && Platform.OS === 'web' ? (
             <iframe
-              src={`https://www.youtube.com/embed/${CURRENT_LESSON.youtubeId}?autoplay=0&rel=0&modestbranding=1`}
-              title={CURRENT_LESSON.title}
+              src={`https://www.youtube.com/embed/${lesson.youtubeId}?autoplay=0&rel=0&modestbranding=1`}
+              title={lesson.title}
               style={{
                 width: '100%',
                 height: '100%',
@@ -112,18 +139,18 @@ export default function LessonDetailScreen() {
                   pressed && { transform: [{ scale: 0.95 }] },
                 ]}
                 onPress={() => {
-                  if (CURRENT_LESSON.youtubeUrl) {
-                    Linking.openURL(CURRENT_LESSON.youtubeUrl);
+                  if (lesson.youtubeUrl) {
+                    Linking.openURL(lesson.youtubeUrl);
                   } else {
                     setIsPlaying(!isPlaying);
                   }
                 }}
               >
                 <Ionicons
-                  name={CURRENT_LESSON.youtubeUrl ? 'logo-youtube' : (isPlaying ? 'pause' : 'play')}
+                  name={lesson.youtubeUrl ? 'logo-youtube' : (isPlaying ? 'pause' : 'play')}
                   size={34}
-                  color={CURRENT_LESSON.youtubeUrl ? '#FF0000' : '#FFFFFF'}
-                  style={!isPlaying && !CURRENT_LESSON.youtubeUrl ? { marginLeft: 4 } : undefined}
+                  color={lesson.youtubeUrl ? '#FF0000' : '#FFFFFF'}
+                  style={!isPlaying && !lesson.youtubeUrl ? { marginLeft: 4 } : undefined}
                 />
               </Pressable>
 
@@ -135,7 +162,7 @@ export default function LessonDetailScreen() {
                     <View style={[styles.videoProgressFill, { width: isPlaying ? '85%' : '75%' }]} />
                   </View>
                   <Text style={styles.videoTimeCounter}>
-                    {isPlaying ? '02:35' : CURRENT_LESSON.videoProgressText} / {CURRENT_LESSON.videoDurationText}
+                    {isPlaying ? '02:35' : lesson.videoProgressText} / {lesson.videoDurationText}
                   </Text>
                 </View>
 
@@ -144,8 +171,8 @@ export default function LessonDetailScreen() {
                   <Pressable
                     style={styles.controlIconBtn}
                     onPress={() => {
-                      if (CURRENT_LESSON.youtubeUrl) {
-                        Linking.openURL(CURRENT_LESSON.youtubeUrl);
+                      if (lesson.youtubeUrl) {
+                        Linking.openURL(lesson.youtubeUrl);
                       } else {
                         setIsPlaying(!isPlaying);
                       }
@@ -178,8 +205,8 @@ export default function LessonDetailScreen() {
                   <Pressable
                     style={styles.controlIconBtn}
                     onPress={() => {
-                      if (CURRENT_LESSON.youtubeUrl) {
-                        Linking.openURL(CURRENT_LESSON.youtubeUrl);
+                      if (lesson.youtubeUrl) {
+                        Linking.openURL(lesson.youtubeUrl);
                       }
                     }}
                   >
@@ -195,16 +222,16 @@ export default function LessonDetailScreen() {
         <View style={styles.tagsRow}>
           <View style={styles.durationPill}>
             <Ionicons name="time-outline" size={14} color="#1D7A46" />
-            <Text style={styles.durationPillText}>3 min de video</Text>
+            <Text style={styles.durationPillText}>{lesson.durationMinutes} min de video</Text>
           </View>
           <View style={styles.techniquePill}>
-            <Text style={styles.techniquePillText}>{CURRENT_LESSON.tag}</Text>
+            <Text style={styles.techniquePillText}>{lesson.tag}</Text>
           </View>
         </View>
 
         {/* Título y Explicación Técnica */}
-        <Text style={styles.lessonTitle}>{CURRENT_LESSON.title}</Text>
-        <Text style={styles.lessonSubtitle}>{CURRENT_LESSON.subtitle}</Text>
+        <Text style={styles.lessonTitle}>{lesson.title}</Text>
+        <Text style={styles.lessonSubtitle}>{lesson.subtitle}</Text>
 
         {/* Card: PUNTOS CLAVE / Recuerda esto */}
         <View style={[styles.keyPointsCard, Shadows.md]}>
@@ -218,50 +245,30 @@ export default function LessonDetailScreen() {
             </View>
           </View>
 
-          {/* Item 1 */}
-          <View style={styles.keyPointItem}>
-            <View style={styles.checkIconCircle}>
-              <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+          {lesson.keyPoints.map((point) => (
+            <View
+              key={point.id}
+              style={point.type === 'critical' ? styles.criticalAlertItem : styles.keyPointItem}
+            >
+              <View
+                style={point.type === 'critical' ? styles.alertIconCircle : styles.checkIconCircle}
+              >
+                {point.type === 'critical' ? (
+                  <MaterialCommunityIcons name="alert" size={16} color="#FFFFFF" />
+                ) : (
+                  <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                )}
+              </View>
+              <View style={styles.keyPointTextContainer}>
+                <Text style={point.type === 'critical' ? styles.criticalHeading : styles.keyPointHeading}>
+                  {point.title}
+                </Text>
+                <Text style={point.type === 'critical' ? styles.criticalBody : styles.keyPointBody}>
+                  {point.description}
+                </Text>
+              </View>
             </View>
-            <View style={styles.keyPointTextContainer}>
-              <Text style={styles.keyPointHeading}>Pedúnculo leñoso</Text>
-              <Text style={styles.keyPointBody}>
-                Sujeta siempre desde el pedúnculo leñoso,{' '}
-                <Text style={{ fontWeight: '700', color: Colors.textPrimary }}>
-                  nunca aprietes las bayas
-                </Text>{' '}
-                con los dedos.
-              </Text>
-            </View>
-          </View>
-
-          {/* Item 2 */}
-          <View style={styles.keyPointItem}>
-            <View style={styles.checkIconCircle}>
-              <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-            </View>
-            <View style={styles.keyPointTextContainer}>
-              <Text style={styles.keyPointHeading}>Protección de Pruina</Text>
-              <Text style={styles.keyPointBody}>
-                Conserva la pruina (el polvo blanquecino natural que protege la uva y certifica
-                frescura).
-              </Text>
-            </View>
-          </View>
-
-          {/* Item 3 (Alerta Crítica) */}
-          <View style={styles.criticalAlertItem}>
-            <View style={styles.alertIconCircle}>
-              <MaterialCommunityIcons name="alert" size={16} color="#FFFFFF" />
-            </View>
-            <View style={styles.keyPointTextContainer}>
-              <Text style={styles.criticalHeading}>Cuidado Crítico</Text>
-              <Text style={styles.criticalBody}>
-                Usa tijeras desinfectadas y afiladas para evitar desgarros en el sarmiento o el
-                racimo.
-              </Text>
-            </View>
-          </View>
+          ))}
         </View>
 
         {/* Banner: Test evaluatorio listo */}
@@ -279,7 +286,7 @@ export default function LessonDetailScreen() {
           <View style={styles.quizBannerContent}>
             <Text style={styles.quizBannerTitle}>Test evaluatorio listo</Text>
             <Text style={styles.quizBannerSubtitle}>
-              {CURRENT_LESSON.quizQuestionCount} preguntas rápidas sobre agarre
+              {lesson.quizQuestionCount} preguntas rápidas
             </Text>
           </View>
           <Ionicons name="arrow-forward" size={18} color={Colors.primary} />
