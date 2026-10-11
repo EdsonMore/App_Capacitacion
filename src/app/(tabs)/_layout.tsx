@@ -1,10 +1,11 @@
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, useRouter } from 'expo-router';
 import { Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 
 export default function TabLayout() {
+  const router = useRouter();
   return (
     <Tabs
       screenOptions={{
@@ -27,7 +28,7 @@ export default function TabLayout() {
       }}
     >
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
           title: 'Inicio',
           tabBarIcon: ({ color, focused }) => (
@@ -38,6 +39,12 @@ export default function TabLayout() {
             />
           ),
         }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.push('/');
+          },
+        }}
       />
       <Tabs.Screen
         name="learn"
@@ -47,19 +54,6 @@ export default function TabLayout() {
             <MaterialCommunityIcons
               name={focused ? 'sprout' : 'sprout-outline'}
               size={24}
-              color={color}
-            />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="achievements"
-        options={{
-          title: 'Mis logros',
-          tabBarIcon: ({ color, focused }) => (
-            <MaterialCommunityIcons
-              name={focused ? 'trophy' : 'trophy-outline'}
-              size={23}
               color={color}
             />
           ),

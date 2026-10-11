@@ -193,57 +193,6 @@ export default function AchievementsScreen() {
           </View>
         </View>
 
-        {/* Sección: Tus Logros Acumulados */}
-        <View style={styles.logrosAcumuladosSection}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Tus Logros Acumulados</Text>
-            <Text style={styles.locationTag}>2 de 3 completados</Text>
-          </View>
-
-          {/* Item 1: Maestro del corte */}
-          <View style={[styles.logroItemCard, Shadows.sm]}>
-            <View style={[styles.logroIconBox, { backgroundColor: '#1E4D2B' }]}>
-              <MaterialCommunityIcons name="content-cut" size={22} color="#FFFFFF" />
-            </View>
-            <View style={styles.logroContent}>
-              <Text style={styles.logroTitle}>Maestro del corte</Text>
-              <Text style={styles.logroDesc}>Corte limpio de pedúnculo sin dañar yema</Text>
-            </View>
-            <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
-          </View>
-
-          {/* Item 2: Protector de la pruina */}
-          <View style={[styles.logroItemCard, Shadows.sm]}>
-            <View style={[styles.logroIconBox, { backgroundColor: '#DCFCE7' }]}>
-              <MaterialCommunityIcons name="leaf" size={22} color="#16A34A" />
-            </View>
-            <View style={styles.logroContent}>
-              <Text style={styles.logroTitle}>Protector de la pruina</Text>
-              <Text style={styles.logroDesc}>Manipulación de racimos por el tallo</Text>
-            </View>
-            <Ionicons name="checkmark-circle" size={24} color="#16A34A" />
-          </View>
-
-          {/* Item 3: Inspector de calidad */}
-          <View style={[styles.logroItemCard, Shadows.sm]}>
-            <View style={[styles.logroIconBox, { backgroundColor: '#F1F5F9' }]}>
-              <MaterialCommunityIcons name="shield-account-outline" size={22} color="#64748B" />
-            </View>
-            <View style={styles.logroContent}>
-              <View style={styles.lockTitleRow}>
-                <Text style={styles.logroTitle}>Inspector de calidad</Text>
-                <Ionicons name="lock-closed" size={14} color="#64748B" style={{ marginLeft: 4 }} />
-              </View>
-              <Text style={styles.logroDesc}>Detección de bayas ácidas o deshidratadas</Text>
-              {/* Mini progreso */}
-              <View style={styles.miniProgressTrack}>
-                <View style={[styles.miniProgressFill, { width: '40%' }]} />
-              </View>
-            </View>
-            <Text style={styles.logroProgressNum}>2 / 5</Text>
-          </View>
-        </View>
-
         {/* Banner de Campo (Fase Activa de Campo) */}
         <ImageBackground
           source={require('@/assets/images/uvapro/hero.jpg')}
@@ -619,61 +568,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     color: '#16A34A',
-  },
-  logrosAcumuladosSection: {
-    gap: Spacing.md,
-  },
-  logroItemCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-  },
-  logroIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: Radius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logroContent: {
-    flex: 1,
-    gap: 2,
-  },
-  logroTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  logroDesc: {
-    fontSize: 12,
-    color: '#64748B',
-  },
-  lockTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  miniProgressTrack: {
-    height: 4,
-    backgroundColor: '#E2E8F0',
-    borderRadius: 2,
-    marginTop: 4,
-    width: '80%',
-    overflow: 'hidden',
-  },
-  miniProgressFill: {
-    height: '100%',
-    backgroundColor: Colors.primary,
-    borderRadius: 2,
-  },
-  logroProgressNum: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#64748B',
   },
   fieldBannerBg: {
     height: 110,

@@ -9,21 +9,32 @@ import {
   Platform,
   StatusBar,
   Linking,
-  Alert,
+  useWindowDimensions,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons, MaterialIcons } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Shadows } from '@/constants/theme';
 import { dataService } from '@/services/dataService';
 import { Lesson } from '@/types';
+import { notify } from '@/utils/notify';
 
 export default function LessonDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 1024;
+  const isTablet = width >= 768 && width < 1024;
+
   const [lesson, setLesson] = useState<Lesson | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackSpeed, setPlaybackSpeed] = useState<'1.0x' | '1.25x' | '1.5x'>('1.0x');
   const [isMuted, setIsMuted] = useState(false);
+
+  const videoHeight = isDesktop
+    ? 430
+    : isTablet
+      ? 360
+      : Math.min(Math.round((width - 32) * 9 / 16), 250);
 
   useEffect(() => {
     let isActive = true;
@@ -32,8 +43,9 @@ export default function LessonDetailScreen() {
     }).catch((error) => {
       console.warn('Error loading lesson:', error);
       if (isActive) {
-        Alert.alert('Lección no disponible', 'No se encontró esta lección de demostración.');
-        router.back();
+        notify('Lección no disponible', 'No se encontró esta lección de demostración.');
+        if (router.canGoBack()) router.back();
+        else router.replace('/learn' as any);
       }
     });
 
@@ -55,11 +67,184 @@ export default function LessonDetailScreen() {
       router.push(`/quiz/${lesson.quizId}` as any);
     } catch (error) {
       console.warn('Error completing lesson:', error);
-      Alert.alert('No se pudo guardar', 'Vuelve a intentarlo en unos momentos.');
+      notify('No se pudo guardar', 'Vuelve a intentarlo en unos momentos.');
     }
   };
 
   if (!lesson) return <View style={styles.screen} />;
+
+  const renderVideoPlayer = () => (
+    <View style={[styles.videoPlayerContainer, { height: videoHeight }, Shadows.lg]}>
+      {lesson.youtubeId && Platform.OS === 'web' ? (
+        <iframe
+          src={`https://www.youtube.com/embed/${lesson.youtubeId}?autoplay=0&rel=0&modestbranding=1`}
+          title={lesson.title}
+          style={{
+            width: '100%',
+            height: '100%',
+            border: 'none',
+            borderRadius: 16,
+          }}
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowFullScreen
+        />
+      ) : (
+        <ImageBackground
+          source={require('../../../assets/images/uvapro/lesson_video.jpg')}
+          style={styles.videoBackground}
+          resizeMode="cover"
+        >
+          {/* Tag Superior: Demostración en Campo */}
+          <View style={styles.fieldDemoTag}>
+            <View style={styles.redDot} />
+            <Text style={styles.fieldDemoText}>DEMOSTRACIÓN EN CAMPO</Text>
+          </View>
+
+          {/* Botón Central de Play/Pause */}
+          <Pressable
+            style={({ pressed }) => [
+              styles.centerPlayButton,
+              pressed && { transform: [{ scale: 0.95 }] },
+            ]}
+            onPress={() => {
+              if (lesson.youtubeUrl) {
+                Linking.openURL(lesson.youtubeUrl);
+              } else {
+                setIsPlaying(!isPlaying);
+              }
+            }}
+          >
+            <Ionicons
+              name={lesson.youtubeUrl ? 'logo-youtube' : (isPlaying ? 'pause' : 'play')}
+              size={34}
+              color={lesson.youtubeUrl ? '#FF0000' : '#FFFFFF'}
+              style={!isPlaying && !lesson.youtubeUrl ? { marginLeft: 4 } : undefined}
+            />
+          </Pressable>
+
+          {/* Controles Inferiores de Reproducción */}
+          <View style={styles.videoControlsOverlay}>
+            <View style={styles.videoTimelineRow}>
+              <View style={styles.videoProgressTrack}>
+                <View style={[styles.videoProgressFill, { width: isPlaying ? '85%' : '75%' }]} />
+              </View>
+              <Text style={styles.videoTimeCounter}>
+                {isPlaying ? '02:35' : lesson.videoProgressText} / {lesson.videoDurationText}
+              </Text>
+            </View>
+
+            <View style={styles.controlsButtonRow}>
+              <Pressable
+                style={styles.controlIconBtn}
+                onPress={() => {
+                  if (lesson.youtubeUrl) {
+                    Linking.openURL(lesson.youtubeUrl);
+                  } else {
+                    setIsPlaying(!isPlaying);
+                  }
+                }}
+              >
+                <MaterialIcons name="replay-10" size={22} color="#FFFFFF" />
+              </Pressable>
+
+              <Pressable style={styles.speedButton} onPress={toggleSpeed}>
+                <Text style={styles.speedButtonText}>{playbackSpeed}</Text>
+              </Pressable>
+
+              <View style={{ flex: 1 }} />
+
+              <Pressable style={styles.controlIconBtn}>
+                <MaterialCommunityIcons name="subtitles-outline" size={20} color="#FFFFFF" />
+              </Pressable>
+
+              <Pressable
+                style={styles.controlIconBtn}
+                onPress={() => setIsMuted(!isMuted)}
+              >
+                <Ionicons
+                  name={isMuted ? 'volume-mute' : 'volume-high'}
+                  size={20}
+                  color="#FFFFFF"
+                />
+              </Pressable>
+
+              <Pressable
+                style={styles.controlIconBtn}
+                onPress={() => {
+                  if (lesson.youtubeUrl) {
+                    Linking.openURL(lesson.youtubeUrl);
+                  }
+                }}
+              >
+                <MaterialCommunityIcons name="fullscreen" size={24} color="#FFFFFF" />
+              </Pressable>
+            </View>
+          </View>
+        </ImageBackground>
+      )}
+    </View>
+  );
+
+  const renderKeyPoints = () => (
+    <View style={[styles.keyPointsCard, Shadows.md]}>
+      <View style={styles.keyPointsHeader}>
+        <View style={styles.bulbCircle}>
+          <MaterialCommunityIcons name="lightbulb-on" size={18} color="#1D7A46" />
+        </View>
+        <Text style={styles.keyPointsTitle}>Recuerda esto de la video guía</Text>
+        <View style={styles.pointsTag}>
+          <Text style={styles.pointsTagText}>PUNTOS CLAVE</Text>
+        </View>
+      </View>
+
+      {lesson.keyPoints.map((point) => (
+        <View
+          key={point.id}
+          style={point.type === 'critical' ? styles.criticalAlertItem : styles.keyPointItem}
+        >
+          <View
+            style={point.type === 'critical' ? styles.alertIconCircle : styles.checkIconCircle}
+          >
+            {point.type === 'critical' ? (
+              <MaterialCommunityIcons name="alert" size={16} color="#FFFFFF" />
+            ) : (
+              <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+            )}
+          </View>
+          <View style={styles.keyPointTextContainer}>
+            <Text style={point.type === 'critical' ? styles.criticalHeading : styles.keyPointHeading}>
+              {point.title}
+            </Text>
+            <Text style={point.type === 'critical' ? styles.criticalBody : styles.keyPointBody}>
+              {point.description}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
+  const renderQuizBanner = () => (
+    <Pressable
+      style={({ pressed }) => [
+        styles.quizBanner,
+        pressed && { opacity: 0.9 },
+        Shadows.sm,
+      ]}
+      onPress={handleFinishLesson}
+    >
+      <View style={styles.quizBannerIcon}>
+        <MaterialCommunityIcons name="clipboard-text-outline" size={20} color="#FFFFFF" />
+      </View>
+      <View style={styles.quizBannerContent}>
+        <Text style={styles.quizBannerTitle}>Evaluación del video lista</Text>
+        <Text style={styles.quizBannerSubtitle}>
+          {lesson.quizQuestionCount} preguntas prácticas para ganar +{lesson.pointsReward} pts
+        </Text>
+      </View>
+      <Ionicons name="arrow-forward" size={18} color={Colors.primary} />
+    </Pressable>
+  );
 
   return (
     <View style={styles.screen}>
@@ -67,25 +252,27 @@ export default function LessonDetailScreen() {
 
       {/* Header Fijo */}
       <View style={styles.topHeader}>
-        <Pressable
-          style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
-        </Pressable>
+        <View style={[styles.headerInnerContainer, isDesktop && styles.containerCentered]}>
+          <Pressable
+            style={({ pressed }) => [styles.backButton, pressed && { opacity: 0.7 }]}
+            onPress={() => router.back()}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.textPrimary} />
+          </Pressable>
 
-        <View style={styles.headerTitleBox}>
-          <View style={styles.headerIconCircle}>
-            <MaterialCommunityIcons name="fruit-grapes" size={16} color="#FFFFFF" />
+          <View style={styles.headerTitleBox}>
+            <View style={styles.headerIconCircle}>
+              <MaterialCommunityIcons name="fruit-grapes" size={16} color="#FFFFFF" />
+            </View>
+            <Text style={styles.headerTitle}>Sesión De Aprendizaje</Text>
           </View>
-          <Text style={styles.headerTitle}>Sesión De Aprendizaje</Text>
-        </View>
 
-        <View style={{ width: 24 }} />
+          <View style={{ width: 24 }} />
+        </View>
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, isDesktop && styles.containerCentered]}
         showsVerticalScrollIndicator={false}
       >
         {/* Subheader: Módulo y Puntos */}
@@ -105,206 +292,89 @@ export default function LessonDetailScreen() {
           </View>
         </View>
 
-        {/* Reproductor de Video (YouTube o Simulación) */}
-        <View style={[styles.videoPlayerContainer, Shadows.lg]}>
-          {lesson.youtubeId && Platform.OS === 'web' ? (
-            <iframe
-              src={`https://www.youtube.com/embed/${lesson.youtubeId}?autoplay=0&rel=0&modestbranding=1`}
-              title={lesson.title}
-              style={{
-                width: '100%',
-                height: '100%',
-                border: 'none',
-                borderRadius: 16,
-              }}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowFullScreen
-            />
-          ) : (
-            <ImageBackground
-              source={require('../../../assets/images/uvapro/lesson_video.jpg')}
-              style={styles.videoBackground}
-              resizeMode="cover"
-            >
-              {/* Tag Superior: Demostración en Campo */}
-              <View style={styles.fieldDemoTag}>
-                <View style={styles.redDot} />
-                <Text style={styles.fieldDemoText}>DEMOSTRACIÓN EN CAMPO</Text>
-              </View>
-
-              {/* Botón Central de Play/Pause */}
-              <Pressable
-                style={({ pressed }) => [
-                  styles.centerPlayButton,
-                  pressed && { transform: [{ scale: 0.95 }] },
-                ]}
-                onPress={() => {
-                  if (lesson.youtubeUrl) {
-                    Linking.openURL(lesson.youtubeUrl);
-                  } else {
-                    setIsPlaying(!isPlaying);
-                  }
-                }}
-              >
-                <Ionicons
-                  name={lesson.youtubeUrl ? 'logo-youtube' : (isPlaying ? 'pause' : 'play')}
-                  size={34}
-                  color={lesson.youtubeUrl ? '#FF0000' : '#FFFFFF'}
-                  style={!isPlaying && !lesson.youtubeUrl ? { marginLeft: 4 } : undefined}
-                />
-              </Pressable>
-
-              {/* Controles Inferiores de Reproducción */}
-              <View style={styles.videoControlsOverlay}>
-                {/* Barra de Tiempo Transcurrido */}
-                <View style={styles.videoTimelineRow}>
-                  <View style={styles.videoProgressTrack}>
-                    <View style={[styles.videoProgressFill, { width: isPlaying ? '85%' : '75%' }]} />
-                  </View>
-                  <Text style={styles.videoTimeCounter}>
-                    {isPlaying ? '02:35' : lesson.videoProgressText} / {lesson.videoDurationText}
-                  </Text>
+        {isDesktop ? (
+          <View style={styles.desktopSplitLayout}>
+            {/* Columna Izquierda: Video y detalles */}
+            <View style={styles.desktopLeftCol}>
+              {renderVideoPlayer()}
+              
+              <View style={styles.tagsRow}>
+                <View style={styles.durationPill}>
+                  <Ionicons name="time-outline" size={14} color="#1D7A46" />
+                  <Text style={styles.durationPillText}>{lesson.durationMinutes} min de video</Text>
                 </View>
-
-                {/* Barra de Botones Multimedia */}
-                <View style={styles.controlsButtonRow}>
-                  <Pressable
-                    style={styles.controlIconBtn}
-                    onPress={() => {
-                      if (lesson.youtubeUrl) {
-                        Linking.openURL(lesson.youtubeUrl);
-                      } else {
-                        setIsPlaying(!isPlaying);
-                      }
-                    }}
-                  >
-                    <MaterialIcons name="replay-10" size={22} color="#FFFFFF" />
-                  </Pressable>
-
-                  <Pressable style={styles.speedButton} onPress={toggleSpeed}>
-                    <Text style={styles.speedButtonText}>{playbackSpeed}</Text>
-                  </Pressable>
-
-                  <View style={{ flex: 1 }} />
-
-                  <Pressable style={styles.controlIconBtn}>
-                    <MaterialCommunityIcons name="subtitles-outline" size={20} color="#FFFFFF" />
-                  </Pressable>
-
-                  <Pressable
-                    style={styles.controlIconBtn}
-                    onPress={() => setIsMuted(!isMuted)}
-                  >
-                    <Ionicons
-                      name={isMuted ? 'volume-mute' : 'volume-high'}
-                      size={20}
-                      color="#FFFFFF"
-                    />
-                  </Pressable>
-
-                  <Pressable
-                    style={styles.controlIconBtn}
-                    onPress={() => {
-                      if (lesson.youtubeUrl) {
-                        Linking.openURL(lesson.youtubeUrl);
-                      }
-                    }}
-                  >
-                    <MaterialCommunityIcons name="fullscreen" size={24} color="#FFFFFF" />
-                  </Pressable>
+                <View style={styles.techniquePill}>
+                  <Text style={styles.techniquePillText}>{lesson.tag}</Text>
                 </View>
-              </View>
-            </ImageBackground>
-          )}
-        </View>
-
-        {/* Tags de Duración y Técnica */}
-        <View style={styles.tagsRow}>
-          <View style={styles.durationPill}>
-            <Ionicons name="time-outline" size={14} color="#1D7A46" />
-            <Text style={styles.durationPillText}>{lesson.durationMinutes} min de video</Text>
-          </View>
-          <View style={styles.techniquePill}>
-            <Text style={styles.techniquePillText}>{lesson.tag}</Text>
-          </View>
-        </View>
-
-        {/* Título y Explicación Técnica */}
-        <Text style={styles.lessonTitle}>{lesson.title}</Text>
-        <Text style={styles.lessonSubtitle}>{lesson.subtitle}</Text>
-
-        {/* Card: PUNTOS CLAVE / Recuerda esto */}
-        <View style={[styles.keyPointsCard, Shadows.md]}>
-          <View style={styles.keyPointsHeader}>
-            <View style={styles.bulbCircle}>
-              <MaterialCommunityIcons name="lightbulb-on" size={18} color="#1D7A46" />
-            </View>
-            <Text style={styles.keyPointsTitle}>Recuerda esto</Text>
-            <View style={styles.pointsTag}>
-              <Text style={styles.pointsTagText}>PUNTOS CLAVE</Text>
-            </View>
-          </View>
-
-          {lesson.keyPoints.map((point) => (
-            <View
-              key={point.id}
-              style={point.type === 'critical' ? styles.criticalAlertItem : styles.keyPointItem}
-            >
-              <View
-                style={point.type === 'critical' ? styles.alertIconCircle : styles.checkIconCircle}
-              >
-                {point.type === 'critical' ? (
-                  <MaterialCommunityIcons name="alert" size={16} color="#FFFFFF" />
-                ) : (
-                  <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+                {lesson.youtubeUrl && (
+                  <Pressable
+                    style={styles.youtubeExternalBtn}
+                    onPress={() => Linking.openURL(lesson.youtubeUrl!)}
+                  >
+                    <Ionicons name="logo-youtube" size={14} color="#DC2626" />
+                    <Text style={styles.youtubeExternalBtnText}>Ver en YouTube</Text>
+                  </Pressable>
                 )}
               </View>
-              <View style={styles.keyPointTextContainer}>
-                <Text style={point.type === 'critical' ? styles.criticalHeading : styles.keyPointHeading}>
-                  {point.title}
-                </Text>
-                <Text style={point.type === 'critical' ? styles.criticalBody : styles.keyPointBody}>
-                  {point.description}
-                </Text>
-              </View>
-            </View>
-          ))}
-        </View>
 
-        {/* Banner: Test evaluatorio listo */}
-        <Pressable
-          style={({ pressed }) => [
-            styles.quizBanner,
-            pressed && { opacity: 0.9 },
-            Shadows.sm,
-          ]}
-          onPress={handleFinishLesson}
-        >
-          <View style={styles.quizBannerIcon}>
-            <MaterialCommunityIcons name="clipboard-text-outline" size={20} color="#FFFFFF" />
+              <Text style={[styles.lessonTitle, { fontSize: 26, lineHeight: 32 }]}>{lesson.title}</Text>
+              <Text style={[styles.lessonSubtitle, { fontSize: 14, lineHeight: 22 }]}>{lesson.subtitle}</Text>
+            </View>
+
+            {/* Columna Derecha: Puntos clave y evaluación */}
+            <View style={styles.desktopRightCol}>
+              {renderKeyPoints()}
+              {renderQuizBanner()}
+            </View>
           </View>
-          <View style={styles.quizBannerContent}>
-            <Text style={styles.quizBannerTitle}>Test evaluatorio listo</Text>
-            <Text style={styles.quizBannerSubtitle}>
-              {lesson.quizQuestionCount} preguntas rápidas
-            </Text>
+        ) : (
+          <View style={styles.mobileStackLayout}>
+            {renderVideoPlayer()}
+
+            <View style={styles.tagsRow}>
+              <View style={styles.durationPill}>
+                <Ionicons name="time-outline" size={14} color="#1D7A46" />
+                <Text style={styles.durationPillText}>{lesson.durationMinutes} min de video</Text>
+              </View>
+              <View style={styles.techniquePill}>
+                <Text style={styles.techniquePillText}>{lesson.tag}</Text>
+              </View>
+              {lesson.youtubeUrl && (
+                <Pressable
+                  style={styles.youtubeExternalBtn}
+                  onPress={() => Linking.openURL(lesson.youtubeUrl!)}
+                >
+                  <Ionicons name="logo-youtube" size={14} color="#DC2626" />
+                  <Text style={styles.youtubeExternalBtnText}>Ver en YouTube</Text>
+                </Pressable>
+              )}
+            </View>
+
+            <Text style={styles.lessonTitle}>{lesson.title}</Text>
+            <Text style={styles.lessonSubtitle}>{lesson.subtitle}</Text>
+
+            {renderKeyPoints()}
+            {renderQuizBanner()}
           </View>
-          <Ionicons name="arrow-forward" size={18} color={Colors.primary} />
-        </Pressable>
+        )}
       </ScrollView>
 
       {/* Botón Inferior Fijo de Acción */}
       <View style={[styles.bottomBar, Shadows.lg]}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.finishLessonBtn,
-            pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
-          ]}
-          onPress={handleFinishLesson}
-        >
-          <Text style={styles.finishLessonText}>Terminé la lección → Ir al test de 2 min</Text>
-          <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#FFFFFF" />
-        </Pressable>
+        <View style={styles.bottomBarInner}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.finishLessonBtn,
+              pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
+            ]}
+            onPress={handleFinishLesson}
+          >
+            <Text style={styles.finishLessonText}>
+              Terminé la video guía → Responder {lesson.quizQuestionCount} preguntas
+            </Text>
+            <MaterialCommunityIcons name="clipboard-check-outline" size={20} color="#FFFFFF" />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -515,6 +585,22 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: Colors.textSecondary,
   },
+  youtubeExternalBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: Radius.full,
+  },
+  youtubeExternalBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#DC2626',
+  },
   lessonTitle: {
     fontSize: 22,
     fontWeight: '800',
@@ -679,4 +765,37 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
   },
+  containerCentered: {
+    maxWidth: 1200,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  headerInnerContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  desktopSplitLayout: {
+    flexDirection: 'row',
+    gap: Spacing.xl,
+    alignItems: 'flex-start',
+    marginTop: Spacing.sm,
+  },
+  desktopLeftCol: {
+    flex: 1.25,
+  },
+  desktopRightCol: {
+    flex: 1,
+    gap: Spacing.md,
+  },
+  mobileStackLayout: {
+    gap: Spacing.md,
+  },
+  bottomBarInner: {
+    maxWidth: 680,
+    width: '100%',
+    alignSelf: 'center',
+  },
 });
+

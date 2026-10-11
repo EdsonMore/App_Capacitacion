@@ -6,10 +6,9 @@ import {
   ScrollView,
   Pressable,
   ImageBackground,
-  Platform,
-  StatusBar,
-  Alert,
+  useWindowDimensions,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Colors, Radius, Spacing, Shadows } from '@/constants/theme';
@@ -19,7 +18,53 @@ import { QuizQuestion } from '@/types';
 export default function QuizScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [loaded, setLoaded] = useState<{ id: string; questions: QuizQuestion[] } | null>(null);
+  const [failedId, setFailedId] = useState<string | null>(null);
+  const quizId = String(id ?? '');
+
+  useEffect(() => {
+    let isActive = true;
+    dataService.getQuizQuestions(quizId).then((data) => {
+      if (!isActive) return;
+      if (data.length > 0) setLoaded({ id: quizId, questions: data });
+      else setFailedId(quizId);
+    }).catch((error) => {
+      console.warn('Error loading quiz:', error);
+      if (isActive) setFailedId(quizId);
+    });
+
+    return () => {
+      isActive = false;
+    };
+  }, [quizId]);
+
+  if (failedId === quizId) {
+    return (
+      <View style={[styles.screen, styles.centerState]}>
+        <MaterialCommunityIcons name="alert-circle-outline" size={44} color={Colors.textSecondary} />
+        <Text style={styles.feedbackTitle}>Evaluación no disponible</Text>
+        <Text style={[styles.feedbackExplanation, { textAlign: 'center' }]}>
+          No se encontró esta evaluación. Vuelve a los módulos e inténtalo de nuevo.
+        </Text>
+        <Pressable style={styles.continueButton} onPress={() => router.replace('/learn' as any)}>
+          <Text style={styles.continueButtonText}>Volver a módulos</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  if (!loaded || loaded.id !== quizId) return <View style={styles.screen} />;
+
+  // El examen solo se monta cuando las preguntas ya existen.
+  return <QuizRunner key={quizId} questions={loaded.questions} />;
+}
+
+function QuizRunner({ questions }: { questions: QuizQuestion[] }) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isDesktop = width >= 1024;
+  const isTablet = width >= 768 && width < 1024;
   const [questionIndex, setQuestionIndex] = useState(0);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [isAnswerChecked, setIsAnswerChecked] = useState(false);
@@ -27,44 +72,29 @@ export default function QuizScreen() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [earnedPoints, setEarnedPoints] = useState(0);
   const [correctAnswers, setCorrectAnswers] = useState(0);
+  const [notice, setNotice] = useState<string | null>(null);
   const submissionInProgress = useRef(false);
 
-  useEffect(() => {
-    let isActive = true;
-    dataService.getQuizQuestions(String(id ?? '')).then((data) => {
-      if (isActive) setQuestions(data);
-    }).catch((error) => {
-      console.warn('Error loading quiz:', error);
-      if (isActive) {
-        Alert.alert('Evaluación no disponible', 'No se encontró esta evaluación de demostración.');
-        router.back();
-      }
-    });
+  const goToLearn = () => router.replace('/learn' as any);
+  const goBack = () => (router.canGoBack() ? router.back() : goToLearn());
 
-    return () => {
-      isActive = false;
-    };
-  }, [id, router]);
-
-  const question = questions[questionIndex];
-  const isCorrect = selectedOptionId === question?.correctOptionId;
+  const question = questions[Math.min(questionIndex, questions.length - 1)];
+  const isCorrect = selectedOptionId === question.correctOptionId;
   const totalPoints = questions.reduce((total, item) => total + item.feedback.points, 0);
 
   const handleSelectOption = (optionId: string) => {
-    if (hasSubmitted) return;
+    if (hasSubmitted || isAnswerChecked) return;
     setSelectedOptionId(optionId);
-    setIsAnswerChecked(false);
+    setNotice(null);
   };
 
   const handleContinue = async () => {
     if (hasSubmitted) {
-      router.replace('/(tabs)' as any);
+      goToLearn();
       return;
     }
-    if (!question) return;
-
     if (!selectedOptionId) {
-      Alert.alert('Elige una respuesta', 'Selecciona una opción para continuar con la evaluación.');
+      setNotice('Selecciona una opción para continuar con la evaluación.');
       return;
     }
 
@@ -75,9 +105,6 @@ export default function QuizScreen() {
         updated[questionIndex] = isCorrect;
         return updated;
       });
-      if (!isCorrect) {
-        Alert.alert('Respuesta incorrecta', 'Puedes continuar; esta pregunta no suma puntos.');
-      }
       return;
     }
 
@@ -85,6 +112,7 @@ export default function QuizScreen() {
       setQuestionIndex((index) => index + 1);
       setSelectedOptionId(null);
       setIsAnswerChecked(false);
+      setNotice(null);
       return;
     }
 
@@ -104,35 +132,145 @@ export default function QuizScreen() {
     } catch (error) {
       submissionInProgress.current = false;
       console.warn('Error saving quiz result:', error);
-      Alert.alert('No se pudo guardar', 'Vuelve a intentarlo en unos momentos.');
+      setNotice('No se pudo guardar el resultado. Vuelve a intentarlo en unos momentos.');
       return;
     }
   };
 
-  if (!question) return <View style={styles.screen} />;
+  const renderOptions = () => (
+    <View style={styles.optionsList}>
+      {question.options.map((option) => {
+        const isSelected = selectedOptionId === option.id;
+        const isOptionCorrect = option.id === question.correctOptionId;
+        const revealCorrect = isAnswerChecked && !isSelected && isOptionCorrect && !isCorrect;
+
+        return (
+          <Pressable
+            key={option.id}
+            style={({ pressed }) => [
+              styles.optionCard,
+              isSelected && !isAnswerChecked && styles.optionCardSelected,
+              isAnswerChecked && (isSelected || revealCorrect) && isOptionCorrect && styles.optionCardCorrect,
+              isAnswerChecked && isSelected && !isOptionCorrect && styles.optionCardWrong,
+              pressed && { opacity: 0.9 },
+              Shadows.sm,
+            ]}
+            onPress={() => handleSelectOption(option.id)}
+            disabled={isAnswerChecked}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isSelected, disabled: isAnswerChecked }}
+          >
+            <View
+              style={[
+                styles.letterCircle,
+                isAnswerChecked && (isSelected || revealCorrect) && isOptionCorrect && styles.letterCircleCorrect,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.letterText,
+                  isAnswerChecked && (isSelected || revealCorrect) && isOptionCorrect && styles.letterTextCorrect,
+                ]}
+              >
+                {option.letter}
+              </Text>
+            </View>
+
+            <Text style={styles.optionText}>{option.text}</Text>
+
+            <View
+              style={[
+                styles.selectionCircle,
+                (isSelected || revealCorrect) && isAnswerChecked && isOptionCorrect && styles.selectionCircleCorrect,
+                isSelected && isAnswerChecked && !isOptionCorrect && styles.selectionCircleWrong,
+                isSelected && !isAnswerChecked && styles.selectionCircleSelected,
+              ]}
+            >
+              {isSelected && !isAnswerChecked && (
+                <Ionicons name="ellipse" size={10} color="#FFFFFF" />
+              )}
+              {(isSelected || revealCorrect) && isAnswerChecked && isOptionCorrect && (
+                <Ionicons name="checkmark" size={14} color="#FFFFFF" />
+              )}
+              {isSelected && isAnswerChecked && !isOptionCorrect && (
+                <Ionicons name="close" size={14} color="#FFFFFF" />
+              )}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+
+  const renderFeedback = () => {
+    if (!isAnswerChecked) return null;
+    if (!isCorrect) {
+      return (
+        <View style={[styles.feedbackCard, styles.feedbackCardWrong, Shadows.md]}>
+          <View style={styles.feedbackHeaderRow}>
+            <View style={[styles.leafIconCircle, styles.wrongIconCircle]}>
+              <Ionicons name="close" size={20} color="#B91C1C" />
+            </View>
+            <View style={styles.feedbackTitleCol}>
+              <Text style={styles.feedbackTitle}>Respuesta incorrecta</Text>
+              <Text style={[styles.feedbackSubtitle, { color: '#B91C1C' }]}>Esta pregunta no suma puntos</Text>
+            </View>
+          </View>
+          <Text style={styles.feedbackExplanation}>{question.feedback.explanation}</Text>
+        </View>
+      );
+    }
+    return (
+      <View style={[styles.feedbackCard, Shadows.md]}>
+        <View style={styles.feedbackHeaderRow}>
+          <View style={styles.leafIconCircle}>
+            <MaterialCommunityIcons name="leaf" size={20} color="#1D7A46" />
+          </View>
+
+          <View style={styles.feedbackTitleCol}>
+            <Text style={styles.feedbackTitle}>{question.feedback.title}</Text>
+            <Text style={styles.feedbackSubtitle}>{question.feedback.subtitle}</Text>
+          </View>
+
+          <View style={styles.pointsPill}>
+            <Text style={styles.pointsPillText}>+{question.feedback.points}</Text>
+            <Text style={styles.pointsPillUnit}>pts</Text>
+          </View>
+        </View>
+
+        <Text style={styles.feedbackExplanation}>{question.feedback.explanation}</Text>
+
+        <View style={styles.standardTag}>
+          <MaterialCommunityIcons name="shield-check" size={14} color="#1D7A46" />
+          <Text style={styles.standardTagText}>{question.feedback.standardTag}</Text>
+        </View>
+      </View>
+    );
+  };
+
 
   return (
     <View style={styles.screen}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-
       {/* Header Fijo */}
-      <View style={styles.topHeader}>
-        <Pressable
-          style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.7 }]}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="close" size={24} color={Colors.textPrimary} />
-        </Pressable>
+      <View style={[styles.topHeader, { paddingTop: insets.top + Spacing.sm }]}>
+        <View style={[styles.headerInnerContainer, (isDesktop || isTablet) && styles.containerCentered]}>
+          <Pressable
+            style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.7 }]}
+            onPress={goBack}
+          >
+            <Ionicons name="close" size={24} color={Colors.textPrimary} />
+          </Pressable>
 
-        <View style={styles.streakPill}>
-          <Ionicons name="flash" size={14} color="#D97706" />
-          <Text style={styles.streakText}>{question.streakText}</Text>
-        </View>
+          <View style={styles.streakPill}>
+            <Ionicons name="flash" size={14} color="#D97706" />
+            <Text style={styles.streakText}>{question.streakText}</Text>
+          </View>
 
-        <View style={styles.counterPill}>
-          <Text style={styles.counterText}>
-            {hasSubmitted ? 'Resultado' : `${question.questionNumber} / ${questions.length}`}
-          </Text>
+          <View style={styles.counterPill}>
+            <Text style={styles.counterText}>
+              {hasSubmitted ? 'Resultado' : `${question.questionNumber} / ${questions.length}`}
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -141,17 +279,23 @@ export default function QuizScreen() {
         <View
           style={[
             styles.progressBarFill,
-            { width: `${(question.questionNumber / question.totalQuestions) * 100}%` },
+            {
+              width: `${((hasSubmitted ? questions.length : question.questionNumber - (isAnswerChecked ? 0 : 1)) / question.totalQuestions) * 100}%`,
+            },
           ]}
         />
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: 120 + insets.bottom },
+          (isDesktop || isTablet) && styles.containerCentered,
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {hasSubmitted ? (
-          <View style={[styles.feedbackCard, Shadows.md]}>
+          <View style={[styles.feedbackCard, (isDesktop || isTablet) && styles.resultCardCentered, Shadows.md]}>
             <View style={styles.feedbackHeaderRow}>
               <View style={styles.leafIconCircle}>
                 <MaterialCommunityIcons name="trophy-award" size={20} color="#1D7A46" />
@@ -176,149 +320,116 @@ export default function QuizScreen() {
               <Text style={styles.standardTagText}>Puntaje máximo: {totalPoints} pts</Text>
             </View>
           </View>
+        ) : isDesktop ? (
+          <View style={styles.desktopQuizLayout}>
+            {/* Columna Izquierda: Contexto, Pregunta e Imagen */}
+            <View style={styles.desktopLeftCol}>
+              <View style={styles.pillsRow}>
+                <View style={styles.categoryPill}>
+                  <MaterialCommunityIcons name="content-cut" size={14} color="#1D7A46" />
+                  <Text style={styles.categoryPillText}>{question.categoryTag}</Text>
+                </View>
+
+                <View style={styles.locationPill}>
+                  <Ionicons name="time-outline" size={13} color={Colors.textSecondary} />
+                  <Text style={styles.locationPillText}>{question.locationTag}</Text>
+                </View>
+              </View>
+
+              <Text style={[styles.questionTitle, { fontSize: 26, lineHeight: 34 }]}>
+                {question.title}
+              </Text>
+
+              <View style={[styles.imageCard, { height: 290 }, Shadows.md]}>
+                <ImageBackground
+                  source={question.imageUri}
+                  style={styles.grapeImage}
+                  resizeMode="cover"
+                >
+                  <View style={styles.imageFocusPill}>
+                    <MaterialCommunityIcons name="shield-check" size={15} color="#FFFFFF" />
+                    <Text style={styles.imageFocusText}>{question.imageFocusText}</Text>
+                  </View>
+                </ImageBackground>
+              </View>
+            </View>
+
+            {/* Columna Derecha: Opciones y Feedback */}
+            <View style={styles.desktopRightCol}>
+              <Text style={styles.optionsPromptText}>Selecciona la alternativa correcta:</Text>
+              {renderOptions()}
+              {renderFeedback()}
+            </View>
+          </View>
         ) : (
-          <>
-        {/* Pills de Contexto de Campo */}
-        <View style={styles.pillsRow}>
-          <View style={styles.categoryPill}>
-            <MaterialCommunityIcons name="content-cut" size={14} color="#1D7A46" />
-            <Text style={styles.categoryPillText}>{question.categoryTag}</Text>
-          </View>
+          <View style={styles.mobileStackLayout}>
+            {/* Pills de Contexto de Campo */}
+            <View style={styles.pillsRow}>
+              <View style={styles.categoryPill}>
+                <MaterialCommunityIcons name="content-cut" size={14} color="#1D7A46" />
+                <Text style={styles.categoryPillText}>{question.categoryTag}</Text>
+              </View>
 
-          <View style={styles.locationPill}>
-            <Ionicons name="time-outline" size={13} color={Colors.textSecondary} />
-            <Text style={styles.locationPillText}>{question.locationTag}</Text>
-          </View>
-        </View>
-
-        {/* Título de la Pregunta */}
-        <Text style={styles.questionTitle}>{question.title}</Text>
-
-        {/* Imagen Ilustrativa del Racimo */}
-        <View style={[styles.imageCard, Shadows.md]}>
-          <ImageBackground
-            source={question.imageUri}
-            style={styles.grapeImage}
-            resizeMode="cover"
-          >
-            <View style={styles.imageFocusPill}>
-              <MaterialCommunityIcons name="shield-check" size={15} color="#FFFFFF" />
-              <Text style={styles.imageFocusText}>{question.imageFocusText}</Text>
+              <View style={styles.locationPill}>
+                <Ionicons name="time-outline" size={13} color={Colors.textSecondary} />
+                <Text style={styles.locationPillText}>{question.locationTag}</Text>
+              </View>
             </View>
-          </ImageBackground>
-        </View>
 
-        {/* Opciones de Respuesta */}
-        <View style={styles.optionsList}>
-          {question.options.map((option) => {
-            const isSelected = selectedOptionId === option.id;
-            const isOptionCorrect = option.id === question.correctOptionId;
+            {/* Título de la Pregunta */}
+            <Text style={styles.questionTitle}>{question.title}</Text>
 
-            return (
-              <Pressable
-                key={option.id}
-                style={({ pressed }) => [
-                  styles.optionCard,
-                  isAnswerChecked && isSelected && isOptionCorrect && styles.optionCardCorrect,
-                  isAnswerChecked && isSelected && !isOptionCorrect && styles.optionCardWrong,
-                  pressed && { opacity: 0.9 },
-                  Shadows.sm,
-                ]}
-                onPress={() => handleSelectOption(option.id)}
+            {/* Imagen Ilustrativa del Racimo */}
+            <View style={[styles.imageCard, { height: isTablet ? 220 : 160 }, Shadows.md]}>
+              <ImageBackground
+                source={question.imageUri}
+                style={styles.grapeImage}
+                resizeMode="cover"
               >
-                <View
-                  style={[
-                    styles.letterCircle,
-                    isAnswerChecked && isSelected && isOptionCorrect && styles.letterCircleCorrect,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.letterText,
-                      isAnswerChecked && isSelected && isOptionCorrect && styles.letterTextCorrect,
-                    ]}
-                  >
-                    {option.letter}
-                  </Text>
+                <View style={styles.imageFocusPill}>
+                  <MaterialCommunityIcons name="shield-check" size={15} color="#FFFFFF" />
+                  <Text style={styles.imageFocusText}>{question.imageFocusText}</Text>
                 </View>
-
-                <Text style={styles.optionText}>{option.text}</Text>
-
-                <View
-                  style={[
-                    styles.selectionCircle,
-                    isSelected && isAnswerChecked && isOptionCorrect && styles.selectionCircleCorrect,
-                    isSelected && isAnswerChecked && !isOptionCorrect && styles.selectionCircleWrong,
-                    isSelected && !isAnswerChecked && styles.selectionCircleSelected,
-                  ]}
-                >
-                  {isSelected && !isAnswerChecked && (
-                    <Ionicons name="ellipse" size={10} color="#FFFFFF" />
-                  )}
-                  {isSelected && isAnswerChecked && isOptionCorrect && (
-                    <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-                  )}
-                </View>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/* Card de Feedback GlobalGAP (Si respondió la correcta) */}
-        {isAnswerChecked && isCorrect && (
-          <View style={[styles.feedbackCard, Shadows.md]}>
-            <View style={styles.feedbackHeaderRow}>
-              <View style={styles.leafIconCircle}>
-                <MaterialCommunityIcons name="leaf" size={20} color="#1D7A46" />
-              </View>
-
-              <View style={styles.feedbackTitleCol}>
-                <Text style={styles.feedbackTitle}>{question.feedback.title}</Text>
-                <Text style={styles.feedbackSubtitle}>{question.feedback.subtitle}</Text>
-              </View>
-
-              <View style={styles.pointsPill}>
-                <Text style={styles.pointsPillText}>+{question.feedback.points}</Text>
-                <Text style={styles.pointsPillUnit}>pts</Text>
-              </View>
+              </ImageBackground>
             </View>
 
-            <Text style={styles.feedbackExplanation}>{question.feedback.explanation}</Text>
-
-            <View style={styles.standardTag}>
-              <MaterialCommunityIcons name="shield-check" size={14} color="#1D7A46" />
-              <Text style={styles.standardTagText}>{question.feedback.standardTag}</Text>
-            </View>
+            {renderOptions()}
+            {renderFeedback()}
           </View>
-        )}
-          </>
         )}
       </ScrollView>
 
       {/* Botón Inferior Fijo */}
-      <View style={[styles.bottomBar, Shadows.lg]}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.continueButton,
-            pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
-          ]}
-          onPress={handleContinue}
-        >
-          <Text style={styles.continueButtonText}>
-            {hasSubmitted
-              ? 'Volver al inicio'
-              : !selectedOptionId || !isAnswerChecked
-                ? 'Comprobar respuesta'
-                : questionIndex === questions.length - 1
-                  ? 'Ver resultado'
-                  : 'Siguiente pregunta'}
-          </Text>
-          <Ionicons
-            name={hasSubmitted ? 'home-outline' : 'arrow-forward'}
-            size={18}
-            color="#FFFFFF"
-          />
-        </Pressable>
+      <View style={[styles.bottomBar, Shadows.lg, { paddingBottom: Spacing.md + insets.bottom }]}>
+        <View style={styles.bottomBarInner}>
+          {notice && (
+            <Text style={styles.noticeText} accessibilityLiveRegion="polite">
+              {notice}
+            </Text>
+          )}
+          <Pressable
+            style={({ pressed }) => [
+              styles.continueButton,
+              pressed && { opacity: 0.9, transform: [{ scale: 0.99 }] },
+            ]}
+            onPress={handleContinue}
+          >
+            <Text style={styles.continueButtonText}>
+              {hasSubmitted
+                ? 'Volver a módulos'
+                : !isAnswerChecked
+                  ? 'Comprobar respuesta'
+                  : questionIndex === questions.length - 1
+                    ? 'Ver resultado'
+                    : 'Siguiente pregunta'}
+            </Text>
+            <Ionicons
+              name={hasSubmitted ? 'home-outline' : 'arrow-forward'}
+              size={18}
+              color="#FFFFFF"
+            />
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -334,7 +445,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 24) + 8 : 48,
     paddingBottom: Spacing.sm,
     backgroundColor: '#FFFFFF',
   },
@@ -389,6 +499,7 @@ const styles = StyleSheet.create({
   },
   pillsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: Spacing.sm,
     alignItems: 'center',
   },
@@ -464,6 +575,29 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     borderWidth: 1.5,
     borderColor: Colors.borderLight,
+  },
+  optionCardSelected: {
+    borderColor: Colors.primary,
+  },
+  centerState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.md,
+    padding: Spacing.xl,
+  },
+  feedbackCardWrong: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  wrongIconCircle: {
+    backgroundColor: '#FEE2E2',
+  },
+  noticeText: {
+    color: '#B91C1C',
+    fontSize: 12,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: Spacing.sm,
   },
   optionCardCorrect: {
     backgroundColor: '#EBF6EE',
@@ -593,7 +727,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
-    paddingBottom: Platform.OS === 'ios' ? 28 : Spacing.md,
     borderTopWidth: 1,
     borderTopColor: Colors.borderLight,
   },
@@ -610,5 +743,50 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+  },
+  headerInnerContainer: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  containerCentered: {
+    maxWidth: 1100,
+    width: '100%',
+    alignSelf: 'center',
+  },
+  resultCardCentered: {
+    maxWidth: 640,
+    width: '100%',
+    alignSelf: 'center',
+    marginVertical: Spacing.xl,
+  },
+  desktopQuizLayout: {
+    flexDirection: 'row',
+    gap: Spacing.xl,
+    alignItems: 'flex-start',
+    marginTop: Spacing.sm,
+  },
+  desktopLeftCol: {
+    flex: 1.1,
+    gap: Spacing.md,
+  },
+  desktopRightCol: {
+    flex: 1.3,
+    gap: Spacing.md,
+  },
+  optionsPromptText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+    marginBottom: 4,
+  },
+  mobileStackLayout: {
+    gap: Spacing.md,
+  },
+  bottomBarInner: {
+    maxWidth: 600,
+    width: '100%',
+    alignSelf: 'center',
   },
 });

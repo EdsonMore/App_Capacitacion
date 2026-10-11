@@ -1,0 +1,9 @@
+{
+  "buildCommand": "npx expo export --platform web",
+  "outputDirectory": "dist",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/lesson/:id", "destination": "/lesson/[id]" },
+    { "source": "/quiz/:id", "destination": "/quiz/[id]" }
+  ]
+}
